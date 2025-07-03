@@ -183,10 +183,11 @@ int sh_basis_cs_exterior(const Eigen::Vector3d &point, dso::StokesCoeffs &cs,
 } /* namespace gravity */
 
 // template <typename C = CartesianCrd>
-[[nodiscard]]
+// [[nodiscard]]
 // int sh_basis_cs_exterior(const C &rsta, dso::StokesCoeffs &cs,
-int sh_basis_cs_exterior(Eigen::Vector3d &rsta, dso::StokesCoeffs &cs,
-                         int max_degree = -1, int max_order = -1) noexcept {
+inline int sh_basis_cs_exterior(Eigen::Vector3d &rsta, dso::StokesCoeffs &cs,
+                                int max_degree = -1,
+                                int max_order = -1) noexcept {
   // static_assert(CoordinateTypeTraits<C>::isCartesian);
 
   /* set (if needed) maximum degree and order of expansion */
@@ -245,10 +246,10 @@ int sh_basis_cs_exterior(Eigen::Vector3d &rsta, dso::StokesCoeffs &cs,
 //   /* return the Stokes coeffs */
 //   return cs;
 // }
-
-int sh_deformation(const Eigen::Vector3d &rsta, const dso::StokesCoeffs &cs,
-                   int max_degree, int max_order, Eigen::Vector3d &gravity,
-                   double &potential, Eigen::Vector3d &dr) noexcept {
+inline int sh_deformation(const Eigen::Vector3d &rsta,
+                          const dso::StokesCoeffs &cs, int max_degree,
+                          int max_order, Eigen::Vector3d &gravity,
+                          double &potential, Eigen::Vector3d &dr) noexcept {
 
   /* set (if needed) maximum degree and order of expansion */
   if (max_degree < 0)
