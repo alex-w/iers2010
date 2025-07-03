@@ -4,7 +4,6 @@
 #include <cassert>
 #include <cmath>
 
-namespace {
 /** @brief  Compute the spherical harmonic basis functions Cnm, Snm
  *
  * This function computes the spherical harmonic basis functions Cnm, Snm​ up
@@ -23,9 +22,9 @@ namespace {
  * These can then be multiplied by the corresponding cnm, snm gravity field
  * coefficients to compute potential, acceleration, etc.
  */
-int sh_basis_cs_exterior(const Eigen::Matrix<double, 3, 1> &point,
-                         dso::StokesCoeffs &cs, int max_degree,
-                         int max_order) noexcept {
+int dso::gravity::sh_basis_cs_exterior(const Eigen::Vector3d &point,
+                                       dso::StokesCoeffs &cs, int max_degree,
+                                       int max_order) noexcept {
   /* Legendre factors:
    * Factors up to degree/order MAX_SIZE_FOR_ALF_FACTORS. Constructed only on
    * the first function call.
@@ -135,9 +134,9 @@ int sh_basis_cs_exterior(const Eigen::Matrix<double, 3, 1> &point,
  * used.
  * @return Anything other than zero denotes an error.
  */
-int ynm(const Eigen::Vector3d &point, const dso::StokesCoeffs &CS,
-        std::vector<double> &y, dso::StokesCoeffs &cs, int max_degree = -1,
-        int max_order = -1) noexcept {
+int dso::gravity::ynm(const Eigen::Vector3d &point, const dso::StokesCoeffs &CS,
+                      std::vector<double> &y, dso::StokesCoeffs &cs,
+                      int max_degree, int max_order) noexcept {
   /* set/check max (n,m) */
   if (max_degree < 0)
     max_degree = CS.max_degree();
@@ -157,8 +156,10 @@ int ynm(const Eigen::Vector3d &point, const dso::StokesCoeffs &CS,
 
   /* compute basis functions, cnm and snm at given point [a]*/
   if (sh_basis_cs_exterior(point / CS.Re(), cs, max_degree, max_order)) {
-    fprintf(stderr, "[ERROR] Failed computing spherical harmonics basis "
-                    "functions! (traceback: %s)\n");
+    fprintf(stderr,
+            "[ERROR] Failed computing spherical harmonics basis "
+            "functions! (traceback: %s)\n",
+            __func__);
     return 2;
   }
 
@@ -191,10 +192,11 @@ int ynm(const Eigen::Vector3d &point, const dso::StokesCoeffs &CS,
    */
 }
 
-int sh_deformation(const Eigen::Vector3d &point, const dso::StokesCoeffs &CS,
-                   dso::StokesCoeffs &cs, Eigen::Vector3d &dr,
-                   Eigen::Vector3d &gravity, double &potential,
-                   int max_degree = -1, int max_order = -1) noexcept {
+int dso::gravity::sh_deformation(const Eigen::Vector3d &point,
+                                 const dso::StokesCoeffs &CS,
+                                 dso::StokesCoeffs &cs, Eigen::Vector3d &dr,
+                                 Eigen::Vector3d &gravity, double &potential,
+                                 int max_degree, int max_order) noexcept {
 
   /* set/check max (n,m) */
   if (max_degree < 0)
@@ -216,8 +218,10 @@ int sh_deformation(const Eigen::Vector3d &point, const dso::StokesCoeffs &CS,
 
   /* compute basis functions, cnm and snm at given point [a]*/
   if (sh_basis_cs_exterior(point / CS.Re(), cs, max_degree, max_order)) {
-    fprintf(stderr, "[ERROR] Failed computing spherical harmonics basis "
-                    "functions! (traceback: %s)\n");
+    fprintf(stderr,
+            "[ERROR] Failed computing spherical harmonics basis "
+            "functions! (traceback: %s)\n",
+            __func__);
     return 2;
   }
 
@@ -230,6 +234,12 @@ int sh_deformation(const Eigen::Vector3d &point, const dso::StokesCoeffs &CS,
 
   /* unit vector at point */
   const Eigen::Vector3d r = point.normalized();
+
+  /* initialize potential */
+  potential = 0e0;
+
+  /* Load Love numbers */
+  const dso::LoadLoveNumbers &love = dso::groopsLoadLoveNumbers;
 
   for (int n = 0; n <= max_degree; n++) {
     Eigen::Vector3d am0, am1, amn;
@@ -324,13 +334,14 @@ int sh_deformation(const Eigen::Vector3d &point, const dso::StokesCoeffs &CS,
     }
 
     const double Vn = (CS.GM() / CS.Re()) * ((Vmn + Vm1) + Vm0);
+    potential += ((Vmn + Vm1) + Vm0);
     const auto gaccn =
         CS.GM() / (2e0 * CS.Re()) *
         std::sqrt(static_cast<double>((2 * n + 1.) / (2 * n + 3.))) *
         ((amn + am1) + am0);
     grav += std::sqrt(static_cast<double>((2 * n + 1.) / (2 * n + 3.))) *
             ((amn + am1) + am0);
-    dr += (hn[n] * Vn) * r + ln[n] * (gaccn - gaccn.dot(r) * r);
+    dr += (love.h[n] * Vn) * r + love.l[n] * (gaccn - gaccn.dot(r) * r);
   } /* loop through n's */
 
   /* scale with gravity at point */
@@ -339,83 +350,7 @@ int sh_deformation(const Eigen::Vector3d &point, const dso::StokesCoeffs &CS,
 
   /* assign for output */
   gravity = grav;
+  potential *= (CS.GM() / CS.Re());
+
   return 0;
-}
-
-} /* anonymous namespace */
-
-template <typename C = CartesianCrd>
-[[no_discard]]
-int sh_basis_cs_exterior(const C &rsta, dso::StokesCoeffs &cs,
-                         int max_degree = -1, int max_order = -1) noexcept {
-  static_assert(dso::CoordinateTypeTraits<C>::isCartesian);
-
-  /* set (if needed) maximum degree and order of expansion */
-  if (max_degree < 0)
-    max_degree = cs.max_degree();
-  if (max_order < 0)
-    max_order = cs.max_order();
-  if ((max_order > max_degree) || (max_degree < 0 || max_order < 0)) {
-    fprintf(stderr,
-            "[ERROR] Invalid degree/order for spherical harmonics expansion! "
-            "(traceback: %s)\n",
-            __func__);
-    return 1;
-  }
-
-  /* check computation degree and order w.r.t. the Stokes coeffs */
-  if (max_degree > cs.max_degree()) {
-    fprintf(stderr,
-            "[ERROR] Requesting computing SH acceleration of degree %d, but "
-            "Stokes coefficients are of size %dx%d (traceback: %s)\n",
-            max_degree, cs.max_degree(), cs.max_order(), __func__);
-    return 1;
-  }
-  if (max_order > cs.max_order()) {
-    fprintf(stderr,
-            "[ERROR] Requesting computing SH acceleration of order %d, but "
-            "Stokes coefficients are of size %dx%d (traceback: %s)\n",
-            max_order, cs.max_degree(), cs.max_order(), __func__);
-    return 1;
-  }
-
-  return sh_basis_cs_exterior(rsta.mv, cs, max_degree, max_order);
-}
-
-template <typename C = CartesianCrd>
-[[no_discard]]
-dso::StokesCoeffs sh_basis_cs_exterior(const C &rsta, int max_degree,
-                                       int max_order) {
-  static_assert(dso::CoordinateTypeTraits<C>::isCartesian);
-
-  /* set (if needed) maximum degree and order of expansion */
-  if ((max_order > max_degree) || (max_degree < 0 || max_order < 0)) {
-    fprintf(stderr,
-            "[ERROR] Invalid degree/order for spherical harmonics expansion! "
-            "(traceback: %s)\n",
-            __func__);
-    throw std::runtime_error(err_msg);
-  }
-
-  dso::StokesCoeffs cs(max_degree, max_order);
-  if (sh_basis_cs_exterior(rsta.mv, cs, max_degree, max_order)) {
-    throw std::runtime_error(err_msg);
-  }
-
-  /* return the Stokes coeffs */
-  return cs;
-}
-
-template <typename C = CartesianCrd>
-[[no_discard]]
-Eigen::Vector3d sh_deformation(const C &rsta, const dso::StokesCoeffs &CS,
-                               int max_degree, int max_order,
-                               Eigen::Vector3d &gravity, double &potential) {
-  if (sh_deformation(rsta.mv, S, dr, gravity, potential, max_degree,
-                     max_order)) {
-    fprintf(stderr,
-            "[ERROR] Failed computing (surface) deformation from SH "
-            "expansion! (traceback: %s)\n",
-            __func__);
-  }
 }

@@ -9,6 +9,7 @@ C++ library implementing the IERS 2010 standards.
 This project contains a number of functions implementing models defined in
 [IERS Conventions (2010)](https://www.iers.org/IERS/EN/Publications/TechnicalNotes/tn36.html/) 
 as described in [^2].
+
 The International Earth Rotation and Reference Systems Service ([IERS](https://www.iers.org/IERS/EN/Home/home_node.html))
 publishes the Conventions along with relevant documents, model implementations and 
 respective test cases; the latter two are available in the FORTRAN programming 
@@ -56,16 +57,14 @@ run it as root, to install the library. Header files will be available at
 
 # Compilation / Installation <a name="compilation-installation"></a>
 
-> January 2022:
-> From now on, only the [scons](https://scons.org/) build will be supported; 
-> support for autotools is dropped.
-
-The project is built via the [scons](https://scons.org/) built system:
-
 ```bash
-$> git clone https://github.com/xanthospap/iers2010.git && cd iers2010
-$> scons
-$> sudo scons install
+## to build in a folder named "build":
+$> cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/usr/local/lib
+$> cmake --build build --target all --config Release
+## (Optional) run tests, see section Testing below
+$> ctest --test-dir build
+## Install, system-wide (needs root)
+$> cd build && sudo make install
 ```
 
 ## Test Programs <a name="test-programs"></a>

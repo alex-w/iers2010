@@ -2,50 +2,8 @@
 #include <array>
 #include <cassert>
 #include <cmath>
-#include <cstdio>
 
 namespace {
-/* Max size for ALF factors; if degree is more than this (-2), then it must
- * be augmented. For now, OK
- */
-constexpr const int MAX_SIZE_FOR_ALF_FACTORS = 201;
-
-struct NormalizedLegendreFactors {
-  dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise> f1;
-  dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise> f2;
-  std::array<double, MAX_SIZE_FOR_ALF_FACTORS> f3;
-
-  NormalizedLegendreFactors() noexcept
-      : f1(MAX_SIZE_FOR_ALF_FACTORS, MAX_SIZE_FOR_ALF_FACTORS),
-        f2(MAX_SIZE_FOR_ALF_FACTORS, MAX_SIZE_FOR_ALF_FACTORS) {
-    constexpr const int N = MAX_SIZE_FOR_ALF_FACTORS;
-    f1.fill_with(0e0);
-    f2.fill_with(0e0);
-
-    /* factors for the recursion ( (2n+1)/2n )^(1/2) */
-    f1(1, 1) = std::sqrt(3e0);
-    for (int n = 2; n < N; n++) {
-      f1(n, n) = std::sqrt((2e0 * n + 1e0) / (2e0 * n));
-    }
-
-    /* factors for the recursion */
-    for (int m = 0; m < N - 1; m++) {
-      for (int n = m + 1; n < N; n++) {
-        const double f =
-            (2e0 * n + 1e0) / static_cast<double>((n + m) * (n - m));
-        /* f1_nm = B_nm */
-        f1(n, m) = std::sqrt(f * (2e0 * n - 1e0));
-        /* f2_nm = B_nm / Bn-1m */
-        f2(n, m) =
-            -std::sqrt(f * (n - m - 1e0) * (n + m - 1e0) / (2e0 * n - 3e0));
-      }
-    }
-
-    /* factors for acceleration */
-    for (int n = 0; n < N; n++)
-      f3[n] = std::sqrt((double)(2 * n + 1) / (2 * n + 3));
-  }
-}; /* NormalizedLegendreFactors */
 
 /** Spherical harmonics of Earth's gravity potential to acceleration and
  *  gradient using the algorithm due to Cunningham. The acceleration and
@@ -77,7 +35,8 @@ int sh2gradient_cunningham_impl(
     dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise>
         &M) noexcept {
 
-  if (max_degree > MAX_SIZE_FOR_ALF_FACTORS - 3) {
+  if (max_degree >
+      dso::NormalizedLegendreFactors::MAX_SIZE_FOR_ALF_FACTORS - 3) {
     fprintf(stderr,
             "[ERROR] (Static) Size for NormalizedLegendreFactors must be "
             "augmented to perform computation (traceback: %s)\n",
@@ -98,7 +57,8 @@ int sh2gradient_cunningham_impl(
   /* Factors up to degree/order MAX_SIZE_FOR_ALF_FACTORS. Constructed only on
    * the first function call
    */
-  static const NormalizedLegendreFactors F;
+  static const dso::NormalizedLegendreFactors F;
+
   /* For the computations, we will need to use a larger degree (due to
    * gradient)
    */
@@ -154,8 +114,8 @@ int sh2gradient_cunningham_impl(
       W(m, m) = F.f1(m, m) * (y * M(m - 1, m - 1) + x * W(m - 1, m - 1));
     }
 
-    //M.multiply(1e-280);
-    //W.multiply(1e-280);
+    // M.multiply(1e-280);
+    // W.multiply(1e-280);
   } /* end computing ALF factors M and W */
 
   /* acceleration and gradient in cartesian components */
@@ -187,22 +147,8 @@ int sh2gradient_cunningham_impl(
         const double ay = cs.C(n, m) * (-Sm1 - Sp1) + cs.S(n, m) * (Cm1 + Cp1);
         const double az = cs.C(n, m) * (-2 * Cm0) + cs.S(n, m) * (-2 * Sm0);
 
-        //// printf("\t[N=%d] %.9e %.9e %.9e %.9e %.9e %.9e\n", n, Cm1, Sm1, Cm0, Sm0, Cp1, Sp1);
-        //if (n>=4 && n<=9) {
-        //  printf("\tprior a=%.9e, %.9e, %.9e\n", acc(0), acc(1), acc(2));
-        //  // printf("\t(%d,0): %.9e %.9e, %.9e, %.9e)\n", n, cs.C(n, 0), Cp1, Sp1, Cm0);
-        //  printf("\ta(%d,%d): %.9e, %.9e, %.9e\n", n, m, ax, ay, az);
-        //}
-        //if (n==8 && m==4) {
-        //  printf("\t[%d,%d] %.9e %.9e %.9e %.9e %.9e %.9e\n", n, m, Cm1, Sm1, Cm0, Sm0, Cp1, Sp1);
-        //  printf("\tax[%d,%d] %.3e * (%.3e -%.3e) + %.3e * (%.3e -%.3e)\n", n, m, cs.C(n, m), Cm1, Cp1, cs.S(n, m), Sm1, Sp1);
-        //  printf("\tay[%d,%d] %.3e * (-%.3e -%.3e) + %.3e * (%.3e +%.3e)\n", n, m, cs.C(n, m), Sm1, Sp1, cs.S(n, m), Cm1, Cp1);
-        //  printf("\taz[%d,%d] %.3e * (-2.0 * %.3e) + %.3e * (-2.0 * %.3e)\n", n, m, cs.C(n, m), Cm0, cs.S(n, m), Sm0);
-        //}
-
         acc += Eigen::Matrix<double, 3, 1>(ax, ay, az) *
                std::sqrt((2e0 * n + 1e0) / (2e0 * n + 3e0));
-
       }
       {
         /* gradient */
@@ -246,7 +192,6 @@ int sh2gradient_cunningham_impl(
                     std::sqrt((2e0 * n + 1e0) / (2e0 * n + 5e0));
       }
     } /* loop over n */
-    // printf("\t>> Acceleration (n,m)>(:,%d) is (%.9f, %.9f, %.9f)\n", m, acc(0), acc(1), acc(2));
   } /* loop over m */
 
   /* order m = 1 (begin summation from smaller terms) */
@@ -317,7 +262,6 @@ int sh2gradient_cunningham_impl(
                   std::sqrt((2e0 * n + 1e0) / (2e0 * n + 5e0));
     }
   } /* loop over all n's for m=1 */
-  // printf("\t>> Acceleration (n,m)>(:,1) is (%.9f, %.9f, %.9f)\n", acc(0), acc(1), acc(2));
 
   /* order m = 0 */
   for (int n = degree; n >= 0; --n) {
@@ -335,7 +279,7 @@ int sh2gradient_cunningham_impl(
       const double ax = cs.C(n, 0) * (-2e0 * Cp1);
       const double ay = cs.C(n, 0) * (-2e0 * Sp1);
       const double az = cs.C(n, 0) * (-2e0 * Cm0);
-      
+
       acc += Eigen::Matrix<double, 3, 1>(ax, ay, az) *
              std::sqrt((2e0 * n + 1.) / (2e0 * n + 3e0));
     }
@@ -369,7 +313,6 @@ int sh2gradient_cunningham_impl(
                   std::sqrt((2e0 * n + 1e0) / (2e0 * n + 5e0));
     }
   } /* loop over all n's for m=0 */
-  // printf("\t>> Acceleration (n,m)>(*,0) is (%.9f, %.9f, %.9f)\n", acc(0), acc(1), acc(2));
 
   /* scale ... */
   gradient *= GM / (4e0 * Re * Re * Re);
