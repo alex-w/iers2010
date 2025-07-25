@@ -256,3 +256,18 @@ target_include_directories(tcheck_eops PRIVATE ${CMAKE_SOURCE_DIR}/costg-benchma
 #  ${COSTG_DATA_DIR}/models/AOD1B_tides/AOD1B_ATM_S3_06.asc
 #  ${COSTG_DATA_DIR}/models/AOD1B_tides/AOD1B_ATM_T3_06.asc
 #)
+
+##
+##  EXTRA CHECKS
+##  The utilize COSTG input/output but are not described in the paper. They 
+##  mostly check modules that have a by-products the COSTG results.
+##
+
+add_executable(extra_02gravityfield_itrf grav_from_deformation_02gravityfield_itrf.cpp ${CMAKE_SOURCE_DIR}/costg-benchmark/bin/costg_utils.cpp)
+target_link_libraries(extra_02gravityfield_itrf PRIVATE iers ${PROJECT_DEPENDENCIES})
+target_include_directories(extra_02gravityfield_itrf PRIVATE ${CMAKE_SOURCE_DIR}/costg-benchmark/bin)
+add_test(NAME extra_costg_02_itrf COMMAND extra_02gravityfield_itrf 
+  ${COSTG_DATA_DIR}/satellite/00orbit_itrf.txt 
+  ${COSTG_DATA_DIR}/models/EIGEN6-C4.gfc 
+  ${COSTG_DATA_DIR}/satellite/02gravityfield_itrf.txt
+)

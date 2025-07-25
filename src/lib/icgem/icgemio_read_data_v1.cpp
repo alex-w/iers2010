@@ -9,24 +9,24 @@ constexpr const int max_data_line = 256;
  *           enough memmory to hold the (to-be-) parsed coefficients.
  */
 int dso::Icgem::parse_data_v1(int l, int k, const Icgem::Datetime &t,
-                           dso::StokesCoeffs &coeffs) noexcept {
+                              dso::StokesCoeffs &coeffs) noexcept {
 
   /* check degree & order parameters */
   int error = 0;
   if (l > max_degree() || k > l) {
-    fprintf(
-        stderr,
-        "[ERROR] Invalid degree/order given to data parse, i.e. (n,m)=(%d,%d) (traceback: %s)\n",
-        l,k,__func__);
+    fprintf(stderr,
+            "[ERROR] Invalid degree/order given to data parse, i.e. "
+            "(n,m)=(%d,%d) (traceback: %s)\n",
+            l, k, __func__);
     error = 1;
   }
 
   /* set max degree and order we are collecting */
   const int n = l;
   const int m = k;
-  
+
   /* clear out Stokes coeffs (i.e. set to zero) and resize (if needed) */
-  coeffs.resize(n,m);
+  coeffs.resize(n, m);
   coeffs.clear();
 
   /* max degree and order actually collected */
@@ -49,61 +49,61 @@ int dso::Icgem::parse_data_v1(int l, int k, const Icgem::Datetime &t,
   char line[max_data_line];
   Icgem::DataEntry entry;
   const auto err = this->errors();
-  double dt=0e0;
-  int current_n=-1, current_m=-1;
-  /* keep reading coefficients. Note that any entry of type 'trnd', 'asin' 
-   * and 'acos' must be superceded by an entry of type 'gfct' so that we have 
-   * the reference epoch 't0' (recorded in gfct) 
+  double dt = 0e0;
+  int current_n = -1, current_m = -1;
+  /* keep reading coefficients. Note that any entry of type 'trnd', 'asin'
+   * and 'acos' must be superceded by an entry of type 'gfct' so that we have
+   * the reference epoch 't0' (recorded in gfct)
    */
   while (fin.getline(line, max_data_line) && !error) {
     error += resolve_icgem_data_line_v1(line, err, entry);
     {
-      double C=0e0,S=0e0;
+      double C = 0e0, S = 0e0;
       if (entry.degree <= n && entry.order <= m) {
         /* set maximum degree/order */
         max_degree_collected = std::max(max_degree_collected, entry.degree);
         max_order_collected = std::max(max_order_collected, entry.order);
         /* compute C and S coeffs */
         switch (entry.key) {
-          case DataEntryType::gfc:
-            C = entry.C;
-            S = entry.S;
-            break;
-          case DataEntryType::gfct:
-            C = entry.C;
-            S = entry.S;
-            /* set current degree, order and t0 */
-            current_n = entry.degree;
-            current_m = entry.order;
-            dt = t.diff<DateTimeDifferenceType::FractionalYears>(entry.t0)
-                     .years();
-            break;
-          case DataEntryType::trnd:
-            C = entry.C * dt;
-            S = entry.S * dt;
-            assert(current_n == entry.degree);
-            assert(current_m == entry.order);
-            break;
-          case DataEntryType::asin:
-            C = entry.C * std::sin((D2PI / entry.period) * dt);
-            S = entry.S * std::sin((D2PI / entry.period) * dt);
-            assert(current_n == entry.degree);
-            assert(current_m == entry.order);
-            break;
-          case DataEntryType::acos:
-            C = entry.C * std::cos((D2PI / entry.period) * dt);
-            S = entry.S * std::cos((D2PI / entry.period) * dt);
-            assert(current_n == entry.degree);
-            assert(current_m == entry.order);
-            break;
-          default:
-            /* just use current_[nm] to silence compiler warnings on set but 
-             * not used variables. setting error to this value, is nothing of 
-             * use.
-             */
-            error += (current_n + current_m);
-            /* should never reach this point */
-            assert(1==0);
+        case DataEntryType::gfc:
+          C = entry.C;
+          S = entry.S;
+          break;
+        case DataEntryType::gfct:
+          C = entry.C;
+          S = entry.S;
+          /* set current degree, order and t0 */
+          current_n = entry.degree;
+          current_m = entry.order;
+          dt =
+              t.diff<DateTimeDifferenceType::FractionalYears>(entry.t0).years();
+          break;
+        case DataEntryType::trnd:
+          C = entry.C * dt;
+          S = entry.S * dt;
+          assert(current_n == entry.degree);
+          assert(current_m == entry.order);
+          break;
+        case DataEntryType::asin:
+          C = entry.C * std::sin((D2PI / entry.period) * dt);
+          S = entry.S * std::sin((D2PI / entry.period) * dt);
+          assert(current_n == entry.degree);
+          assert(current_m == entry.order);
+          break;
+        case DataEntryType::acos:
+          C = entry.C * std::cos((D2PI / entry.period) * dt);
+          S = entry.S * std::cos((D2PI / entry.period) * dt);
+          assert(current_n == entry.degree);
+          assert(current_m == entry.order);
+          break;
+        default:
+          /* just use current_[nm] to silence compiler warnings on set but
+           * not used variables. setting error to this value, is nothing of
+           * use.
+           */
+          error += (current_n + current_m);
+          /* should never reach this point */
+          assert(1 == 0);
         }
         coeffs.C(entry.degree, entry.order) += C;
         coeffs.S(entry.degree, entry.order) += S;
@@ -141,7 +141,18 @@ int dso::Icgem::parse_data_v1(int l, int k, const Icgem::Datetime &t,
   coeffs.GM() = this->gm();
   coeffs.Re() = this->radius();
   coeffs.normalized() = this->is_normalized();
-  /* if needed, set the actual dimensions of the StokesCoeffs instance */
+
+  /* if needed, set the actual dimensions of the StokesCoeffs instance.
+   * Here is a little special case:
+   * What if we requested (n,m)=(1,1) but the C/S(1,1) are missing from the
+   * input file because they are zero?
+   * Well, at this case we should set the coeffs size to (1,1) not (0,0) which
+   * are the (max_degree_collected, max_order_collected).
+   */
+  if ((n == 1) && (max_degree_collected == 0))
+    max_degree_collected = 1;
+  if ((m == 1) && (max_order_collected == 0))
+    max_order_collected = 1;
   coeffs.shrink_dimensions(max_degree_collected, max_order_collected);
 
   /* all done */

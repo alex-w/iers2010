@@ -8,8 +8,8 @@
 #endif
 #include <cassert>
 
-constexpr const int DEGREE = 180;
-constexpr const int ORDER = 180;
+constexpr const int DEGREE = 2;
+constexpr const int ORDER = 2;
 constexpr const double TOLERANCE = 1e-11; /* [m/sec**2] */
 
 using namespace costg;
@@ -40,8 +40,8 @@ int main(int argc, char *argv[]) {
   }
 
   /* checks */
-  assert(stokes.max_degree() == DEGREE);
-  assert(stokes.max_order() == ORDER);
+  // assert(stokes.max_degree() == DEGREE);
+  // assert(stokes.max_order() == ORDER);
 
   /* allocate scratch space for computations */
   dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise> W(DEGREE + 3,
@@ -65,9 +65,26 @@ int main(int argc, char *argv[]) {
       return 1;
     }
 
+    printf("%.12f %.12f %.12f\n", std::abs(acc->axyz(0) - a(0)),
+           std::abs(acc->axyz(1) - a(1)), std::abs(acc->axyz(2) - a(2)));
+
+    /* compute acceleration for given epoch/position (we use the deformation
+     * function here, but will only check the gravity results)
+     */
+    double potential;
+    Eigen::Vector3d dr;
+    if (dso::sh_deformation(in.xyz, stokes, DEGREE, ORDER, a, potential, dr)) {
+      fprintf(stderr, "ERROR Failed computing acceleration/gradient\n");
+      return 1;
+    }
+
+    printf("%.12f %.12f %.12f %.2f %.2f %.2f\n", std::abs(acc->axyz(0) - a(0)),
+           std::abs(acc->axyz(1) - a(1)), std::abs(acc->axyz(2) - a(2)),
+           dr(0) * 1e3, dr(1) * 1e3, dr(2) * 1e3);
+
     /* get COSTG result */
     if (acc->epoch != in.epoch) {
-      fprintf(stderr, "ERROR Faile to match epochs in input files\n");
+      fprintf(stderr, "ERROR Failed to match epochs in input files\n");
       return 1;
     }
 

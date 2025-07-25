@@ -143,12 +143,22 @@ int sh2gradient_cunningham_impl(
         const double Cp1 = wp1 * M(n + 1, m + 1);
         const double Sp1 = wp1 * W(n + 1, m + 1);
 
+        printf("C(%d,%d)=%.12e, C(%d,%d)=%.12e C(%d,%d)=%.12e\n", n + 1, m - 1,
+               M(n + 1, m - 1), n + 1, m, M(n + 1, m), n + 1, m + 1,
+               M(n + 1, m + 1));
+
         const double ax = cs.C(n, m) * (Cm1 - Cp1) + cs.S(n, m) * (Sm1 - Sp1);
         const double ay = cs.C(n, m) * (-Sm1 - Sp1) + cs.S(n, m) * (Cm1 + Cp1);
         const double az = cs.C(n, m) * (-2 * Cm0) + cs.S(n, m) * (-2 * Sm0);
 
         acc += Eigen::Matrix<double, 3, 1>(ax, ay, az) *
                std::sqrt((2e0 * n + 1e0) / (2e0 * n + 3e0));
+
+        const Eigen::Vector3d tmp =
+            Eigen::Matrix<double, 3, 1>(ax, ay, az) *
+            std::sqrt((2e0 * n + 1e0) / (2e0 * n + 3e0));
+        printf("\t[2] a(%d,%d)=(%.12e, %.12e, %.12e)\n", n, m, tmp(0), tmp(1),
+               tmp(2));
       }
       {
         /* gradient */
@@ -216,6 +226,9 @@ int sh2gradient_cunningham_impl(
       const double Sm0 = wm0 * W(n + 1, m);
       const double Cp1 = wp1 * M(n + 1, m + 1);
       const double Sp1 = wp1 * W(n + 1, m + 1);
+      printf("C(%d,%d)=%.12e, C(%d,%d)=%.12e C(%d,%d)=%.12e\n", n + 1, m - 1,
+             M(n + 1, m - 1), n + 1, m, M(n + 1, m), n + 1, m + 1,
+             M(n + 1, m + 1));
 
       const double ax = cs.C(n, m) * (Cm1 - Cp1) + cs.S(n, m) * (Sm1 - Sp1);
       const double ay = cs.C(n, m) * (-Sm1 - Sp1) + cs.S(n, m) * (Cm1 + Cp1);
@@ -223,6 +236,11 @@ int sh2gradient_cunningham_impl(
 
       acc += Eigen::Matrix<double, 3, 1>(ax, ay, az) *
              std::sqrt((2e0 * n + 1e0) / (2e0 * n + 3e0));
+
+      const Eigen::Vector3d tmp = Eigen::Matrix<double, 3, 1>(ax, ay, az) *
+                                  std::sqrt((2e0 * n + 1e0) / (2e0 * n + 3e0));
+      printf("\t[2] a(%d,%d)=(%.12e, %.12e, %.12e)\n", n, m, tmp(0), tmp(1),
+             tmp(2));
     }
     {
       /* gradient */
@@ -282,6 +300,12 @@ int sh2gradient_cunningham_impl(
 
       acc += Eigen::Matrix<double, 3, 1>(ax, ay, az) *
              std::sqrt((2e0 * n + 1.) / (2e0 * n + 3e0));
+
+      const Eigen::Matrix<double, 3, 1> tmp =
+          Eigen::Matrix<double, 3, 1>(ax, ay, az) *
+          std::sqrt((2e0 * n + 1.) / (2e0 * n + 3e0));
+      printf("\t[2] a(%d,%d)=(%.12e, %.12e, %.12e)\n", n, m, tmp(0), tmp(1),
+             tmp(2));
     }
     {
       /* gradient */
@@ -317,6 +341,7 @@ int sh2gradient_cunningham_impl(
   /* scale ... */
   gradient *= GM / (4e0 * Re * Re * Re);
   acc *= GM / (2e0 * Re * Re);
+  printf("\t[2] a(:,:)=(%.12e, %.12e, %.12e)\n", acc(0), acc(1), acc(2));
 
   return 0;
 }

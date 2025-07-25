@@ -5,10 +5,10 @@
 
 constexpr const int max_data_line = 256;
 
-/** @todo In this function, we recompute sin/cos values that are not needed 
- * (~ line 64 & 79) for C and S coefficients. This is branchless alright, but 
- * dould nevertheless. We could avoid this by checking the type of current 
- * coefficient parsed (i.e. 'trnd', 'asin', ...) and only compute trigs 
+/** @todo In this function, we recompute sin/cos values that are not needed
+ * (~ line 64 & 79) for C and S coefficients. This is branchless alright, but
+ * dould nevertheless. We could avoid this by checking the type of current
+ * coefficient parsed (i.e. 'trnd', 'asin', ...) and only compute trigs
  * when needed (switch loop). See also the parse_data_v1 function.
  */
 int dso::Icgem::parse_data_v2(int l, int k, const Icgem::Datetime &t,
@@ -27,9 +27,9 @@ int dso::Icgem::parse_data_v2(int l, int k, const Icgem::Datetime &t,
   /* set max degree and order we are collecting */
   const int n = l;
   const int m = k;
-  
+
   /* clear out Stokes coeffs (i.e. set to zero) and resize (if needed) */
-  coeffs.resize(n,m);
+  coeffs.resize(n, m);
   coeffs.clear();
 
   /* max degree and order actually collected */
@@ -67,8 +67,8 @@ int dso::Icgem::parse_data_v2(int l, int k, const Icgem::Datetime &t,
         /* ------------------------------------------------------------------
          * WARNING !!
          * ------------------------------------------------------------------
-         *  It took me fucking hours to debug this! if entry.period is zero, 
-         *  the then computations below may result in a nan value, and cast the 
+         *  It took me fucking hours to debug this! if entry.period is zero,
+         *  the then computations below may result in a nan value, and cast the
          *  collected values to garbage.
          *  Be extra careful to correctly avoid this issue.
          */
@@ -129,7 +129,18 @@ int dso::Icgem::parse_data_v2(int l, int k, const Icgem::Datetime &t,
   coeffs.GM() = this->gm();
   coeffs.Re() = this->radius();
   coeffs.normalized() = this->is_normalized();
-  /* if needed, set the actual dimensions of the StokesCoeffs instance */
+
+  /* if needed, set the actual dimensions of the StokesCoeffs instance.
+   * Here is a little special case:
+   * What if we requested (n,m)=(1,1) but the C/S(1,1) are missing from the
+   * input file because they are zero?
+   * Well, at this case we should set the coeffs size to (1,1) not (0,0) which
+   * are the (max_degree_collected, max_order_collected).
+   */
+  if ((n == 1) && (max_degree_collected == 0))
+    max_degree_collected = 1;
+  if ((m == 1) && (max_order_collected == 0))
+    max_order_collected = 1;
   coeffs.shrink_dimensions(max_degree_collected, max_order_collected);
 
   /* all done */

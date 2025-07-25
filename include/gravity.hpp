@@ -256,7 +256,8 @@ inline int sh_deformation(const Eigen::Vector3d &rsta,
     max_degree = cs.max_degree();
   if (max_order < 0)
     max_order = cs.max_order();
-  if ((max_order > max_degree) || (max_degree < 0 || max_order < 0)) {
+
+  if (max_order > max_degree) {
     fprintf(stderr,
             "[ERROR] Invalid degree/order for spherical harmonics expansion! "
             "(traceback: %s)\n",

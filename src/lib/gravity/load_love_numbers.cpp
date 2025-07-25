@@ -1,6 +1,6 @@
 #include "load_love_numbers.hpp"
 
-dso::LoadLoveNumbers groopsLoadLoveNumbers = {
+dso::LoadLoveNumbers dso::groopsLoadLoveNumbers = {
     /* h */ {+0.000000000000e+00, -1.285877758000e+00, -9.915810331000e-01,
              -1.050767745000e+00, -1.053393012000e+00, -1.086317605000e+00,
              -1.143860336000e+00, -1.212408459000e+00, -1.283943275000e+00,

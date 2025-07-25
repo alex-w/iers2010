@@ -13,7 +13,6 @@
 
 constexpr const int DEGREE = 180;
 constexpr const int ORDER = 180;
-[[maybe_unused]]constexpr const int formatD3Plot = 0;
 constexpr const double TOLERANCE = 1e-11; /* [m/sec**2] */
 
 using namespace costg;
@@ -23,7 +22,8 @@ int main(int argc, char *argv[]) {
     fprintf(stderr,
             "Usage: %s [00orbit_itrf.txt] [10oceanTide_eot11a_M2_icrf.txt] "
             "[01earthRotation_rotaryMatrix.txt] [eopc04.1962-now] "
-            "[EOT11a_001fileList.txt] [EOT11a_002doodson.txt] [EOT11a_003admittance.txt] [EOT gfc dir]\n",
+            "[EOT11a_001fileList.txt] [EOT11a_002doodson.txt] "
+            "[EOT11a_003admittance.txt] [EOT gfc dir]\n",
             argv[0]);
     return 1;
   }
@@ -57,14 +57,8 @@ int main(int argc, char *argv[]) {
   }
 
   /* create an OceanTide instance using the gfc files */
-  dso::OceanTide eot11a = dso::groops_ocean_atlas(argv[5], argv[6], argv[7], argv[8]);
-
-  /* spit out a title for plotting */
-  //if (formatD3Plot) {
-  //  printf("mjd,sec,refval,val,component\n");
-  //} else {
-  //  printf("#title Ocean Tidal Loading - %s Major\n", eot11a.atlas().name());
-  //}
+  dso::OceanTide eot11a =
+      dso::groops_ocean_atlas(argv[5], argv[6], argv[7], argv[8]);
 
   /* compare results epoch by epoch */
   double fargs[5];
@@ -93,8 +87,8 @@ int main(int argc, char *argv[]) {
     eot11a.stokes_coeffs().S(1, 1) = 0e0;
 
     /* compute acceleration for given epoch/position (ITRF) */
-    if (dso::sh2gradient_cunningham(eot11a.stokes_coeffs(), in.xyz, a, g,
-                                    -1, -1, -1, -1, &W, &M)) {
+    if (dso::sh2gradient_cunningham(eot11a.stokes_coeffs(), in.xyz, a, g, -1,
+                                    -1, -1, -1, &W, &M)) {
       fprintf(stderr, "ERROR Failed computing acceleration/gradient\n");
       return 1;
     }
@@ -109,19 +103,6 @@ int main(int argc, char *argv[]) {
       fprintf(stderr, "ERROR Failed to match epochs in input files\n");
       return 1;
     }
-
-    //if (formatD3Plot) {
-    //  printf("%d,%.9f,%.17e,%.17e,X\n", in.epoch.imjd(),
-    //         in.epoch.seconds().seconds(), acc->axyz(0), a(0));
-    //  printf("%d,%.9f,%.17e,%.17e,Y\n", in.epoch.imjd(),
-    //         in.epoch.seconds().seconds(), acc->axyz(1), a(1));
-    //  printf("%d,%.9f,%.17e,%.17e,Z\n", in.epoch.imjd(),
-    //         in.epoch.seconds().seconds(), acc->axyz(2), a(2));
-    //} else {
-    //  printf("%d %.9f %.17e %.17e %.17e %.17e %.17e %.17e\n", in.epoch.imjd(),
-    //         in.epoch.seconds().seconds(), acc->axyz(0), acc->axyz(1),
-    //         acc->axyz(2), a(0), a(1), a(2));
-    //}
 
     assert(std::abs(acc->axyz(0) - a(0)) < TOLERANCE);
     assert(std::abs(acc->axyz(1) - a(1)) < TOLERANCE);
