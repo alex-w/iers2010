@@ -8,7 +8,11 @@ namespace {
 /** Spherical harmonics of Earth's gravity potential to acceleration and
  *  gradient using the algorithm due to Cunningham. The acceleration and
  *  gradient are computed in Cartesian components, i.e.
- *  acceleration = (ax, ay, az), and
+ *
+ *  acceleration = (ax, ay, az)
+ *
+ * , and
+ *
  *             | dax/dx dax/dy dax/dz |
  *  gradient = | day/dx day/dy day/dz |
  *             | daz/dx daz/dy daz/dz |
@@ -88,6 +92,8 @@ int sh2gradient_cunningham_impl(
     M(1, 0) = std::sqrt(3e0) * z * M(0, 0);
     for (int n = 2; n <= degree + 2; n++) {
       M(n, 0) = F.f1(n, 0) * z * M(n - 1, 0) + F.f2(n, 0) * rr * M(n - 2, 0);
+      printf("C(%d,0)=%.5e * %.5e * %.5e + %.5e * %.5e * %.5e\n", n, F.f1(n, 0),
+             z, M(n - 1, 0), F.f2(n, 0), rr, M(n - 2, 0));
     }
 
     /* fill all elements for order m >= 1 */
@@ -118,6 +124,13 @@ int sh2gradient_cunningham_impl(
     // W.multiply(1e-280);
   } /* end computing ALF factors M and W */
 
+  for (int n = 0; n <= max_degree + 1; n++) {
+    for (int m = 0; m <= std::min(n, max_order + 1); m++) {
+      printf("\tM(%d,%d)=%+.12e", n, m, M(n, m));
+    }
+    printf("\n");
+  }
+
   /* acceleration and gradient in cartesian components */
   acc = Eigen::Matrix<double, 3, 1>::Zero();
   gradient = Eigen::Matrix<double, 3, 3>::Zero();
@@ -143,22 +156,27 @@ int sh2gradient_cunningham_impl(
         const double Cp1 = wp1 * M(n + 1, m + 1);
         const double Sp1 = wp1 * W(n + 1, m + 1);
 
-        printf("C(%d,%d)=%.12e, C(%d,%d)=%.12e C(%d,%d)=%.12e\n", n + 1, m - 1,
-               M(n + 1, m - 1), n + 1, m, M(n + 1, m), n + 1, m + 1,
+        printf("\tUsing M(%d,%d)=%.9f M(%d,%d)=%.9f M(%d,%d)=%.9f\n", n + 1,
+               m - 1, M(n + 1, m - 1), n + 1, m, M(n + 1, m), n + 1, m + 1,
                M(n + 1, m + 1));
-
+        printf("\tCm1=%.5e*%.5e Cm0=%.5e*%.5e Cp1=%.5e*%.5e", wm1,
+               M(n + 1, m - 1), wm0, M(n + 1, m), wp1, M(n + 1, m + 1));
         const double ax = cs.C(n, m) * (Cm1 - Cp1) + cs.S(n, m) * (Sm1 - Sp1);
+        printf("\tg.x(%d,%d) = %.9e * %.9e + %.9e * %.9e\n", n, m, cs.C(n, m),
+               (Cm1 - Cp1), cs.S(n, m), (Sm1 - Sp1));
         const double ay = cs.C(n, m) * (-Sm1 - Sp1) + cs.S(n, m) * (Cm1 + Cp1);
         const double az = cs.C(n, m) * (-2 * Cm0) + cs.S(n, m) * (-2 * Sm0);
 
         acc += Eigen::Matrix<double, 3, 1>(ax, ay, az) *
                std::sqrt((2e0 * n + 1e0) / (2e0 * n + 3e0));
 
-        const Eigen::Vector3d tmp =
-            Eigen::Matrix<double, 3, 1>(ax, ay, az) *
-            std::sqrt((2e0 * n + 1e0) / (2e0 * n + 3e0));
-        printf("\t[2] a(%d,%d)=(%.12e, %.12e, %.12e)\n", n, m, tmp(0), tmp(1),
-               tmp(2));
+        {
+          const Eigen::Vector3d g =
+              Eigen::Matrix<double, 3, 1>(ax, ay, az) *
+              std::sqrt((2e0 * n + 1e0) / (2e0 * n + 3e0));
+          printf("\t[1] (%d,%d) -> (%+.12e, %+.12e, %+.12e)\n", n, m, g.x(),
+                 g.y(), g.z());
+        }
       }
       {
         /* gradient */
@@ -226,21 +244,26 @@ int sh2gradient_cunningham_impl(
       const double Sm0 = wm0 * W(n + 1, m);
       const double Cp1 = wp1 * M(n + 1, m + 1);
       const double Sp1 = wp1 * W(n + 1, m + 1);
-      printf("C(%d,%d)=%.12e, C(%d,%d)=%.12e C(%d,%d)=%.12e\n", n + 1, m - 1,
-             M(n + 1, m - 1), n + 1, m, M(n + 1, m), n + 1, m + 1,
-             M(n + 1, m + 1));
 
+      printf("\tUsing M(%d,%d)=%.9f M(%d,%d)=%.9f M(%d,%d)=%.9f\n", n + 1,
+             m - 1, M(n + 1, m - 1), n + 1, m, M(n + 1, m), n + 1, m + 1,
+             M(n + 1, m + 1));
+      printf("\tCm1=%.5e*%.5e Cm0=%.5e*%.5e Cp1=%.5e*%.5e", wm1,
+             M(n + 1, m - 1), wm0, M(n + 1, m), wp1, M(n + 1, m + 1));
       const double ax = cs.C(n, m) * (Cm1 - Cp1) + cs.S(n, m) * (Sm1 - Sp1);
+      printf("\tg.x(%d,%d) = %.9e * %.9e + %.9e * %.9e\n", n, m, cs.C(n, m),
+             (Cm1 - Cp1), cs.S(n, m), (Sm1 - Sp1));
       const double ay = cs.C(n, m) * (-Sm1 - Sp1) + cs.S(n, m) * (Cm1 + Cp1);
       const double az = cs.C(n, m) * (-2e0 * Cm0) + cs.S(n, m) * (-2 * Sm0);
 
       acc += Eigen::Matrix<double, 3, 1>(ax, ay, az) *
              std::sqrt((2e0 * n + 1e0) / (2e0 * n + 3e0));
-
-      const Eigen::Vector3d tmp = Eigen::Matrix<double, 3, 1>(ax, ay, az) *
+      {
+        const Eigen::Vector3d g = Eigen::Matrix<double, 3, 1>(ax, ay, az) *
                                   std::sqrt((2e0 * n + 1e0) / (2e0 * n + 3e0));
-      printf("\t[2] a(%d,%d)=(%.12e, %.12e, %.12e)\n", n, m, tmp(0), tmp(1),
-             tmp(2));
+        printf("\t[1] (%d,%d) -> (%+.12e, %+.12e, %+.12e)\n", n, m, g.x(),
+               g.y(), g.z());
+      }
     }
     {
       /* gradient */
@@ -301,11 +324,12 @@ int sh2gradient_cunningham_impl(
       acc += Eigen::Matrix<double, 3, 1>(ax, ay, az) *
              std::sqrt((2e0 * n + 1.) / (2e0 * n + 3e0));
 
-      const Eigen::Matrix<double, 3, 1> tmp =
-          Eigen::Matrix<double, 3, 1>(ax, ay, az) *
-          std::sqrt((2e0 * n + 1.) / (2e0 * n + 3e0));
-      printf("\t[2] a(%d,%d)=(%.12e, %.12e, %.12e)\n", n, m, tmp(0), tmp(1),
-             tmp(2));
+      {
+        const Eigen::Vector3d g = Eigen::Matrix<double, 3, 1>(ax, ay, az) *
+                                  std::sqrt((2e0 * n + 1.) / (2e0 * n + 3e0));
+        printf("\t[1] (%d,%d) -> (%+.12e, %+.12e, %+.12e)\n", n, m, g.x(),
+               g.y(), g.z());
+      }
     }
     {
       /* gradient */
@@ -341,7 +365,6 @@ int sh2gradient_cunningham_impl(
   /* scale ... */
   gradient *= GM / (4e0 * Re * Re * Re);
   acc *= GM / (2e0 * Re * Re);
-  printf("\t[2] a(:,:)=(%.12e, %.12e, %.12e)\n", acc(0), acc(1), acc(2));
 
   return 0;
 }

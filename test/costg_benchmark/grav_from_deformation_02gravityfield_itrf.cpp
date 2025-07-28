@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
       return 1;
     }
 
-    printf("%.12f %.12f %.12f\n", std::abs(acc->axyz(0) - a(0)),
+    printf("[Results (1)] %.12f %.12f %.12f\n", std::abs(acc->axyz(0) - a(0)),
            std::abs(acc->axyz(1) - a(1)), std::abs(acc->axyz(2) - a(2)));
 
     /* compute acceleration for given epoch/position (we use the deformation
@@ -78,9 +78,10 @@ int main(int argc, char *argv[]) {
       return 1;
     }
 
-    printf("%.12f %.12f %.12f %.2f %.2f %.2f\n", std::abs(acc->axyz(0) - a(0)),
-           std::abs(acc->axyz(1) - a(1)), std::abs(acc->axyz(2) - a(2)),
-           dr(0) * 1e3, dr(1) * 1e3, dr(2) * 1e3);
+    printf("[Results (2)] %.12f %.12f %.12f %.2f %.2f %.2f\n",
+           std::abs(acc->axyz(0) - a(0)), std::abs(acc->axyz(1) - a(1)),
+           std::abs(acc->axyz(2) - a(2)), dr(0) * 1e3, dr(1) * 1e3,
+           dr(2) * 1e3);
 
     /* get COSTG result */
     if (acc->epoch != in.epoch) {

@@ -172,80 +172,22 @@ int sh2gradient_cunningham(
 /* ----------------------------------------------------------------- */
 namespace gravity {
 int sh_deformation(const Eigen::Vector3d &point, const dso::StokesCoeffs &CS,
-                   dso::StokesCoeffs &cs, Eigen::Vector3d &dr,
-                   Eigen::Vector3d &gravity, double &potential,
-                   int max_degree = -1, int max_order = -1) noexcept;
+                   Eigen::Vector3d &dr, Eigen::Vector3d &gravity,
+                   double &potential, int max_degree = -1,
+                   int max_order = -1) noexcept;
+
 int ynm(const Eigen::Vector3d &point, const dso::StokesCoeffs &CS,
         std::vector<double> &y, dso::StokesCoeffs &cs, int max_degree = -1,
         int max_order = -1) noexcept;
-int sh_basis_cs_exterior(const Eigen::Vector3d &point, dso::StokesCoeffs &cs,
-                         int max_degree, int max_order) noexcept;
+
+int sh_basis_cs_exterior(
+    const Eigen::Vector3d &rsta, int max_degree, int max_order,
+    dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise> &C,
+    dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise>
+        &S) noexcept;
+
 } /* namespace gravity */
 
-// template <typename C = CartesianCrd>
-// [[nodiscard]]
-// int sh_basis_cs_exterior(const C &rsta, dso::StokesCoeffs &cs,
-inline int sh_basis_cs_exterior(Eigen::Vector3d &rsta, dso::StokesCoeffs &cs,
-                                int max_degree = -1,
-                                int max_order = -1) noexcept {
-  // static_assert(CoordinateTypeTraits<C>::isCartesian);
-
-  /* set (if needed) maximum degree and order of expansion */
-  if (max_degree < 0)
-    max_degree = cs.max_degree();
-  if (max_order < 0)
-    max_order = cs.max_order();
-  if ((max_order > max_degree) || (max_degree < 0 || max_order < 0)) {
-    fprintf(stderr,
-            "[ERROR] Invalid degree/order for spherical harmonics expansion! "
-            "(traceback: %s)\n",
-            __func__);
-    return 1;
-  }
-
-  /* check computation degree and order w.r.t. the Stokes coeffs */
-  if (max_degree > cs.max_degree()) {
-    fprintf(stderr,
-            "[ERROR] Requesting computing SH acceleration of degree %d, but "
-            "Stokes coefficients are of size %dx%d (traceback: %s)\n",
-            max_degree, cs.max_degree(), cs.max_order(), __func__);
-    return 1;
-  }
-  if (max_order > cs.max_order()) {
-    fprintf(stderr,
-            "[ERROR] Requesting computing SH acceleration of order %d, but "
-            "Stokes coefficients are of size %dx%d (traceback: %s)\n",
-            max_order, cs.max_degree(), cs.max_order(), __func__);
-    return 1;
-  }
-
-  return gravity::sh_basis_cs_exterior(rsta, cs, max_degree, max_order);
-}
-
-// template <typename C = CartesianCrd>
-//[[no_discard]]
-// dso::StokesCoeffs sh_basis_cs_exterior(const C &rsta, int max_degree,
-//                                        int max_order) {
-//   static_assert(dso::CoordinateTypeTraits<C>::isCartesian);
-//
-//   /* set (if needed) maximum degree and order of expansion */
-//   if ((max_order > max_degree) || (max_degree < 0 || max_order < 0)) {
-//     fprintf(stderr,
-//             "[ERROR] Invalid degree/order for spherical harmonics expansion!
-//             "
-//             "(traceback: %s)\n",
-//             __func__);
-//     throw std::runtime_error(err_msg);
-//   }
-//
-//   dso::StokesCoeffs cs(max_degree, max_order);
-//   if (gravity::sh_basis_cs_exterior(rsta.mv, cs, max_degree, max_order)) {
-//     throw std::runtime_error(err_msg);
-//   }
-//
-//   /* return the Stokes coeffs */
-//   return cs;
-// }
 inline int sh_deformation(const Eigen::Vector3d &rsta,
                           const dso::StokesCoeffs &cs, int max_degree,
                           int max_order, Eigen::Vector3d &gravity,
@@ -282,9 +224,8 @@ inline int sh_deformation(const Eigen::Vector3d &rsta,
   }
 
   /* compute deformation */
-  dso::StokesCoeffs scratch(max_degree, max_order);
-  if (gravity::sh_deformation(rsta, cs, scratch, dr, gravity, potential,
-                              max_degree, max_order)) {
+  if (gravity::sh_deformation(rsta, cs, dr, gravity, potential, max_degree,
+                              max_order)) {
     fprintf(stderr,
             "[ERROR] Failed computing (surface) deformation from SH "
             "expansion! (traceback: %s)\n",

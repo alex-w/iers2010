@@ -22,13 +22,21 @@
  * These can then be multiplied by the corresponding cnm, snm gravity field
  * coefficients to compute potential, acceleration, etc.
  */
-int dso::gravity::sh_basis_cs_exterior(const Eigen::Vector3d &point,
-                                       dso::StokesCoeffs &cs, int max_degree,
-                                       int max_order) noexcept {
-  /* Legendre factors:
-   * Factors up to degree/order MAX_SIZE_FOR_ALF_FACTORS. Constructed only on
-   * the first function call.
-   */
+int dso::gravity::sh_basis_cs_exterior(
+    const Eigen::Vector3d &rsta, int max_degree, int max_order,
+    dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise> &C,
+    dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise>
+        &S) noexcept {
+
+  if (((C.rows() < max_degree) || (C.cols() < max_degree)) ||
+      ((S.rows() < max_degree) || (S.cols() < max_degree))) {
+    fprintf(stderr,
+            "[ERROR] Invalid C/S size(s) for computing SH coefficients "
+            "(traceback: %s)\n",
+            __func__);
+    return 1;
+  }
+
   if (max_degree >
       dso::NormalizedLegendreFactors::MAX_SIZE_FOR_ALF_FACTORS - 3) {
     fprintf(stderr,
@@ -36,79 +44,101 @@ int dso::gravity::sh_basis_cs_exterior(const Eigen::Vector3d &point,
             "augmented to perform computation (traceback: %s)\n",
             __func__);
     assert(false);
+    return 1;
   }
+
+  /* Factors up to degree/order MAX_SIZE_FOR_ALF_FACTORS. Constructed only on
+   * the first function call
+   */
   static const dso::NormalizedLegendreFactors F;
 
-  /* clear coefficients */
-  cs.clear();
+  /* nullify scratch space */
+  C.fill_with(0e0);
+  S.fill_with(0e0);
 
-  /* Normalize input point and handle scale */
-  const double x = point.x() / point.squaredNorm();
-  const double y = point.y() / point.squaredNorm();
-  const double z = point.z() / point.squaredNorm();
-  cs.C(0, 0) = 1e280 / point.norm();
-  cs.S(0, 0) = 0e0;
-
-  const double rr = point.squaredNorm();
-  /* start looping, column wise */
   {
-    /* column 0 */
-    const int m = 0;
-    /* First subdiagonal */
-    cs.C(1, m) = F.f1(1, m) * z * cs.C(0, m);
-    cs.S(1, m) = F.f1(1, m) * z * cs.S(0, m);
-    /* rest of column */
-    for (int n = m + 2; n <= max_degree; n++) {
-      cs.C(n, m) =
-          F.f1(n, m) * z * cs.C(n - 1, m) + F.f2(n, m) * rr * cs.C(n - 2, m);
-      cs.S(n, m) =
-          F.f1(n, m) * z * cs.S(n - 1, m) + F.f2(n, m) * rr * cs.S(n - 2, m);
-    }
-  }
+    /* (kinda) Associated Legendre Polynomials M and W
+     * note that since we are going to compute derivatives (of the gravity
+     * potential), we will compute M and W up to degree n+2,m+2
+     */
+    const double rr = 1e0 / rsta.squaredNorm();
+    const double x = rsta.x() * rr;
+    const double y = rsta.y() * rr;
+    const double z = rsta.z() * rr;
 
-  /* rest of columns, but not last column */
-  for (int m = 1; m < max_order - 1; m++) {
-    /* diagonal term */
-    cs.C(m, m) = F.f1(m, m) * (x * cs.C(m - 1, m - 1) - y * cs.S(m - 1, m - 1));
-    cs.S(m, m) = F.f1(m, m) * (y * cs.C(m - 1, m - 1) + x * cs.S(m - 1, m - 1));
-    /* first sub-diagonal */
-    cs.C(m + 1, m) = F.f1(m + 1, m) * z * cs.C(m, m);
-    cs.S(m + 1, m) = F.f1(m + 1, m) * z * cs.S(m, m);
-    /* all other rows */
-    for (int n = m + 2; n <= max_degree; n++) {
-      cs.C(n, m) =
-          F.f1(n, m) * z * cs.C(n - 1, m) + F.f2(n, m) * rr * cs.C(n - 2, m);
-      cs.S(n, m) =
-          F.f1(n, m) * z * cs.S(n - 1, m) + F.f2(n, m) * rr * cs.S(n - 2, m);
-    }
-  }
+    /* start ALF iteration (can use scaling according to Holmes et al, 2002) */
+    C(0, 0) = 1e0 / rsta.norm();
 
-  /* last column */
-  {
-    const int m = max_order;
-    cs.C(m, m) = F.f1(m, m) * (x * cs.C(m - 1, m - 1) - y * cs.S(m - 1, m - 1));
-    cs.S(m, m) = F.f1(m, m) * (y * cs.C(m - 1, m - 1) + x * cs.S(m - 1, m - 1));
-
-    const int diff = max_degree - max_order;
-    if (diff >= 1) {
-      /* first sub-diagonal */
-      cs.C(m + 1, m) = F.f1(m + 1, m) * z * cs.C(m, m);
-      cs.S(m + 1, m) = F.f1(m + 1, m) * z * cs.S(m, m);
-    }
-    if (diff >= 2) {
-      /* all other rows */
-      for (int n = m + 2; n <= max_degree; n++) {
-        cs.C(n, m) =
-            F.f1(n, m) * z * cs.C(n - 1, m) + F.f2(n, m) * rr * cs.C(n - 2, m);
-        cs.S(n, m) =
-            F.f1(n, m) * z * cs.S(n - 1, m) + F.f2(n, m) * rr * cs.S(n - 2, m);
+    {
+      /* first fill m=0 terms; note that W(n,0) = 0 (already set) */
+      double *__restrict__ C0 = C.column(0);
+      // C(1, 0) = std::sqrt(3e0) * z * C(0, 0);
+      C0[1] = std::sqrt(3e0) * z * C0[0];
+      for (int n = 2; n <= max_degree; n++) {
+        // C(n, 0) = F.f1(n, 0) * z * C(n - 1, 0) + F.f2(n, 0) * rr * C(n - 2,
+        // 0);
+        C0[n] = F.f1(n, 0) * z * C0[n - 1] + F.f2(n, 0) * rr * C0[n - 2];
       }
     }
-  }
 
-  /* Rescale to undo 1e280 */
-  cs.scale(1e-280);
+    /* fill all elements for order m >= 1 */
+    for (int m = 1; m < max_order; m++) {
+      double *__restrict__ Cm = C.column(m);
+      double *__restrict__ Sm = S.column(m);
+      const double Cm1m1 = C(m - 1, m - 1);
+      const double Sm1m1 = S(m - 1, m - 1);
 
+      /* M(m,m) and W(m,m) aka, diagonal */
+      // C(m, m) = F.f1(m, m) * (x * C(m - 1, m - 1) - y * S(m - 1, m - 1));
+      // S(m, m) = F.f1(m, m) * (y * C(m - 1, m - 1) + x * S(m - 1, m - 1));
+      Cm[0] = F.f1(m, m) * (x * Cm1m1 - y * Sm1m1);
+      Sm[0] = F.f1(m, m) * (y * Cm1m1 + x * Sm1m1);
+
+      /* if n=m+1 , we do not have a M(n-2,...) aka sub-diagonal term */
+      // C(m + 1, m) = F.f1(m + 1, m) * z * C(m, m);
+      // S(m + 1, m) = F.f1(m + 1, m) * z * S(m, m);
+      Cm[1] = F.f1(m + 1, m) * z * Cm[0];
+      Sm[1] = F.f1(m + 1, m) * z * Sm[0];
+
+      /* go on .... */
+      for (int n = m + 2; n <= max_degree; n++) {
+        // C(n, m) = F.f1(n, m) * z * C(n - 1, m) + F.f2(n, m) * rr * C(n - 2,
+        // m); S(n, m) = F.f1(n, m) * z * S(n - 1, m) + F.f2(n, m) * rr * S(n -
+        // 2, m);
+        const int j = n - m;
+        Cm[j] = F.f1(n, m) * z * Cm[j - 1] + F.f2(n, m) * rr * Cm[j - 2];
+        Sm[j] = F.f1(n, m) * z * Sm[j - 1] + F.f2(n, m) * rr * Sm[j - 2];
+      }
+    }
+
+    {
+      /* well, we've left the lst column uncomputed */
+      const int m = max_order;
+      double *__restrict__ Cm = C.column(m);
+      double *__restrict__ Sm = S.column(m);
+      const double Cm1m1 = C(m - 1, m - 1);
+      const double Sm1m1 = S(m - 1, m - 1);
+
+      // C(m, m) = F.f1(m, m) * (x * C(m - 1, m - 1) - y * S(m - 1, m - 1));
+      // S(m, m) = F.f1(m, m) * (y * C(m - 1, m - 1) + x * S(m - 1, m - 1));
+      Cm[0] = F.f1(m, m) * (x * Cm1m1 - y * Sm1m1);
+      Sm[0] = F.f1(m, m) * (y * Cm1m1 + x * Sm1m1);
+
+      if (max_degree > max_order) {
+        // C(m + 1, m) = F.f1(m + 1, m) * z * C(m, m);
+        // S(m + 1, m) = F.f1(m + 1, m) * z * S(m, m);
+        Cm[1] = F.f1(m + 1, m) * z * Cm[0];
+        Sm[1] = F.f1(m + 1, m) * z * Sm[0];
+        for (int n = m + 2; n <= max_degree; n++) {
+          C(n, m) =
+              F.f1(n, m) * z * C(n - 1, m) + F.f2(n, m) * rr * C(n - 2, m);
+          S(n, m) =
+              F.f1(n, m) * z * S(n - 1, m) + F.f2(n, m) * rr * S(n - 2, m);
+        }
+      }
+    }
+
+  } /* end computing ALF factors M and W */
   return 0;
 }
 
@@ -153,15 +183,16 @@ int dso::gravity::ynm(const Eigen::Vector3d &point, const dso::StokesCoeffs &CS,
 
   /* resize cs (to be computed). */
   cs.resize(max_degree, max_degree);
+  [[maybe_unused]] const Eigen::Vector3d rsta = point;
 
   /* compute basis functions, cnm and snm at given point [a]*/
-  if (sh_basis_cs_exterior(point / CS.Re(), cs, max_degree, max_order)) {
-    fprintf(stderr,
-            "[ERROR] Failed computing spherical harmonics basis "
-            "functions! (traceback: %s)\n",
-            __func__);
-    return 2;
-  }
+  // if (sh_basis_cs_exterior(point / CS.Re(), cs, max_degree, max_order)) {
+  //   fprintf(stderr,
+  //           "[ERROR] Failed computing spherical harmonics basis "
+  //           "functions! (traceback: %s)\n",
+  //           __func__);
+  //   return 2;
+  // }
 
   /* Yn = GM/R * sum (cnm*Cnm + snm*Snm) */
   y.reserve(max_degree);
@@ -193,18 +224,18 @@ int dso::gravity::ynm(const Eigen::Vector3d &point, const dso::StokesCoeffs &CS,
 }
 
 int dso::gravity::sh_deformation(const Eigen::Vector3d &point,
-                                 const dso::StokesCoeffs &CS,
-                                 dso::StokesCoeffs &cs, Eigen::Vector3d &dr,
-                                 Eigen::Vector3d &gravity, double &potential,
-                                 int max_degree, int max_order) noexcept {
+                                 const dso::StokesCoeffs &cs,
+                                 Eigen::Vector3d &dr, Eigen::Vector3d &gravity,
+                                 double &potential, int max_degree,
+                                 int max_order) noexcept {
 
   /* set/check max (n,m) */
   if (max_degree < 0)
-    max_degree = CS.max_degree();
+    max_degree = cs.max_degree();
   if (max_order < 0)
-    max_order = CS.max_order();
+    max_order = cs.max_order();
 
-  if (((max_degree > CS.max_degree()) || (max_order > CS.max_order())) ||
+  if (((max_degree > cs.max_degree()) || (max_order > cs.max_order())) ||
       (max_degree < max_order)) {
     fprintf(stderr,
             "[ERROR] Invalid degree/order for deformation computation; "
@@ -214,16 +245,24 @@ int dso::gravity::sh_deformation(const Eigen::Vector3d &point,
     fprintf(stderr,
             "[ERROR] (contd) (N,M)=(%d,%d), Model=(%d,%d), Scratch=(%d,%d) "
             "(traceback: %s)\n",
-            max_degree, max_order, CS.max_degree(), CS.max_order(),
+            max_degree, max_order, cs.max_degree(), cs.max_order(),
             cs.max_degree(), cs.max_order(), __func__);
     return 1;
   }
 
-  /* resize cs (to be computed). */
-  cs.resize(max_degree, max_degree);
+  /* We need to allocate scratch space for SH coefficients. The coefficients
+   * should span the range [0, max_degree+1] and [0, max_order+1], but note that
+   * here we are allocating matrices, hence their size should be (max_degree+2,
+   * max_order+2)
+   */
+  dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise> M(
+      max_degree + 2, max_degree + 2);
+  dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise> W(
+      max_degree + 2, max_degree + 2);
 
   /* compute basis functions, cnm and snm at given point [a] */
-  if (sh_basis_cs_exterior(point / CS.Re(), cs, max_degree, max_order)) {
+  if (sh_basis_cs_exterior(point / cs.Re(), max_degree + 1, max_order + 1, M,
+                           W)) {
     fprintf(stderr,
             "[ERROR] Failed computing spherical harmonics basis "
             "functions! (traceback: %s)\n",
@@ -235,7 +274,7 @@ int dso::gravity::sh_deformation(const Eigen::Vector3d &point,
   dr << 0e0, 0e0, 0e0;
 
   /* (total) gravity at point */
-  Eigen::Vector3d grav;
+  Eigen::Vector3d grav, g, tg;
   grav << 0e0, 0e0, 0e0;
 
   /* unit vector at point */
@@ -247,41 +286,45 @@ int dso::gravity::sh_deformation(const Eigen::Vector3d &point,
   /* Load Love numbers */
   const dso::LoadLoveNumbers &love = dso::groopsLoadLoveNumbers;
 
-  for (int n = 0; n <= max_degree; n++) {
-    Eigen::Vector3d am0, amn;
-    am0 << 0e0, 0e0, 0e0;
-    amn << 0e0, 0e0, 0e0;
-    double Vm0 = 0e0, Vmn = 0e0;
+  for (int n = 0; n <= max_degree + 1; n++) {
+    for (int m = 0; m <= std::min(n, max_order + 1); m++) {
+      printf("\tM(%d,%d)=%+.12e", n, m, M(n, m));
+    }
+    printf("\n");
+  }
 
+  for (int n = 0; n <= max_degree; n++) {
     /* order m=0 */
     {
       const int m = 0;
 
       /* potential */
-      Vm0 = CS.C(n, m) * cs.C(n, m);
+      potential = M(n, m) * cs.C(n, m);
 
       /* acceleration i.e grad(V) */
       const double wm0 = std::sqrt(static_cast<double>(n + 1) * (n + 1));
       const double wp1 =
           std::sqrt(static_cast<double>(n + 1) * (n + 2)) / std::sqrt(2e0);
 
-      const double Cm0 = wm0 * cs.C(n + 1, 0);
-      const double Cp1 = wp1 * cs.C(n + 1, 1);
-      const double Sp1 = wp1 * cs.S(n + 1, 1);
+      const double Cm0 = wm0 * M(n + 1, 0);
+      const double Cp1 = wp1 * M(n + 1, 1);
+      const double Sp1 = wp1 * W(n + 1, 1);
 
-      const double ax = CS.C(n, 0) * (-2e0 * Cp1);
-      const double ay = CS.C(n, 0) * (-2e0 * Sp1);
-      const double az = CS.C(n, 0) * (-2e0 * Cm0);
+      g.x() = cs.C(n, 0) * (-2e0 * Cp1);
+      g.y() = cs.C(n, 0) * (-2e0 * Sp1);
+      g.z() = cs.C(n, 0) * (-2e0 * Cm0);
 
-      am0 = Eigen::Vector3d(ax, ay, az);
-      printf("\t[1] a(%d,%d)=(%.12e, %.12e, %.12e)\n", n, m, ax, ay, az);
+      printf("\t[2] (%d,%d) -> (%+.12e, %+.12e, %+.12e)\n", n, m,
+             std::sqrt((2. * n + 1.) / (2. * n + 3.)) * g.x(),
+             std::sqrt((2. * n + 1.) / (2. * n + 3.)) * g.y(),
+             std::sqrt((2. * n + 1.) / (2. * n + 3.)) * g.z());
     }
 
     /* all other orders, m=1,...,max_order */
     {
       for (int m = 1; m <= std::min(n, max_order); m++) {
         /* potential */
-        Vmn += CS.C(n, m) * cs.C(n, m) + CS.S(n, m) * cs.S(n, m);
+        potential += M(n, m) * cs.C(n, m) + W(n, m) * cs.S(n, m);
 
         /* acceleration i.e grad(V) */
         const double wm1 =
@@ -292,38 +335,46 @@ int dso::gravity::sh_deformation(const Eigen::Vector3d &point,
         const double wp1 =
             std::sqrt(static_cast<double>(n + m + 1) * (n + m + 2));
 
-        const double Cm1 = wm1 * cs.C(n + 1, m - 1);
-        const double Cm0 = wm0 * cs.C(n + 1, m);
-        const double Cp1 = wp1 * cs.C(n + 1, m + 1);
-        const double Sm1 = wm1 * cs.S(n + 1, m - 1);
-        const double Sm0 = wm0 * cs.S(n + 1, m);
-        const double Sp1 = wp1 * cs.S(n + 1, m + 1);
-        printf("C(%d,%d)=%.12e, C(%d,%d)=%.12e C(%d,%d)=%.12e\n", n + 1, m - 1,
-               CS.C(n + 1, m - 1), n + 1, m, CS.C(n + 1, m), n + 1, m + 1,
-               CS.C(n + 1, m + 1));
+        const double Cm1 = wm1 * M(n + 1, m - 1);
+        const double Cm0 = wm0 * M(n + 1, m);
+        const double Cp1 = wp1 * M(n + 1, m + 1);
+        const double Sm1 = wm1 * W(n + 1, m - 1);
+        const double Sm0 = wm0 * W(n + 1, m);
+        const double Sp1 = wp1 * W(n + 1, m + 1);
 
-        const double ax = CS.C(n, m) * (Cm1 - Cp1) + CS.S(n, m) * (Sm1 - Sp1);
-        const double ay = CS.C(n, m) * (-Sm1 - Sp1) + CS.S(n, m) * (Cm1 + Cp1);
-        const double az = CS.C(n, m) * (-2 * Cm0) + CS.S(n, m) * (-2 * Sm0);
+        printf("\tUsing M(%d,%d)=%.9f M(%d,%d)=%.9f M(%d,%d)=%.9f\n", n + 1,
+               m - 1, M(n + 1, m - 1), n + 1, m, M(n + 1, m), n + 1, m + 1,
+               M(n + 1, m + 1));
+        printf("\tCm1=%.5e*%.5e Cm0=%.5e*%.5e Cp1=%.5e*%.5e", wm1,
+               M(n + 1, m - 1), wm0, M(n + 1, m), wp1, M(n + 1, m + 1));
+        g.x() += cs.C(n, m) * (Cm1 - Cp1) + cs.S(n, m) * (Sm1 - Sp1);
+        printf("\tg.x(%d,%d) = %.9e * %.9e + %.9e * %.9e\n", n, m, cs.C(n, m),
+               (Cm1 - Cp1), cs.S(n, m), (Sm1 - Sp1));
+        g.y() += cs.C(n, m) * (-Sm1 - Sp1) + cs.S(n, m) * (Cm1 + Cp1);
+        g.z() += cs.C(n, m) * (-2 * Cm0) + cs.S(n, m) * (-2 * Sm0);
 
-        amn += Eigen::Vector3d(ax, ay, az);
-        printf("\t[1] a(%d,%d)=(%.12e, %.12e, %.12e)\n", n, m, ax, ay, az);
+        tg.x() = cs.C(n, m) * (Cm1 - Cp1) + cs.S(n, m) * (Sm1 - Sp1);
+        printf("\tg.x(%d,%d) = %.9e * %.9e + %.9e * %.9e\n", n, m, cs.C(n, m),
+               (Cm1 - Cp1), cs.S(n, m), (Sm1 - Sp1));
+        tg.y() = cs.C(n, m) * (-Sm1 - Sp1) + cs.S(n, m) * (Cm1 + Cp1);
+        tg.z() = cs.C(n, m) * (-2 * Cm0) + cs.S(n, m) * (-2 * Sm0);
+        printf("\t[2] (%d,%d) -> (%+.12e, %+.12e, %+.12e)\n", n, m,
+               std::sqrt((2. * n + 1.) / (2. * n + 3.)) * tg.x(),
+               std::sqrt((2. * n + 1.) / (2. * n + 3.)) * tg.y(),
+               std::sqrt((2. * n + 1.) / (2. * n + 3.)) * tg.z());
       }
     } /* done with m's ... */
-
-    const double Vn = (CS.GM() / CS.Re()) * (Vmn + Vm0);
-    potential += (Vmn + Vm0);
-    grav += std::sqrt((2e0 * n + 1e0) / (2e0 * n + 3e0)) * (amn + am0);
-    dr += (love.h[n] * Vn) * r + love.l[n] * (grav - grav.dot(r) * r);
+    grav += std::sqrt((2. * n + 1.) / (2. * n + 3.)) * g;
+    dr += (love.h[n] * potential) * r + love.l[n] * (grav - grav.dot(r) * r);
   } /* loop through n's */
 
   /* scale with gravity at point */
-  // grav *= CS.GM() / (2e0 * CS.Re());
   dr *= (1e0 / grav.norm());
 
   /* assign for output */
-  gravity = CS.GM() / (2 * CS.Re() * CS.Re()) * grav;
-  potential *= (CS.GM() / CS.Re());
+  grav *= cs.GM() / (2 * cs.Re() * cs.Re());
+  potential *= (cs.GM() / cs.Re());
 
+  gravity = grav;
   return 0;
 }
