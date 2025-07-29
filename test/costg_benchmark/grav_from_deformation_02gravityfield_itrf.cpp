@@ -8,8 +8,14 @@
 #endif
 #include <cassert>
 
-constexpr const int DEGREE = 2;
-constexpr const int ORDER = 2;
+/* This test is a copy of the 02(itrf) check, but instead of using the 
+ * 'fitting' function to compute gravity, it uses the 'deformation' function. 
+ * This makes sure that gravity computed in the deformation function is 
+ * the same as the one computed in the cunningham_normalized function.
+ */
+
+constexpr const int DEGREE = 180;
+constexpr const int ORDER = 180;
 constexpr const double TOLERANCE = 1e-11; /* [m/sec**2] */
 
 using namespace costg;
@@ -40,8 +46,8 @@ int main(int argc, char *argv[]) {
   }
 
   /* checks */
-  // assert(stokes.max_degree() == DEGREE);
-  // assert(stokes.max_order() == ORDER);
+  assert(stokes.max_degree() == DEGREE);
+  assert(stokes.max_order() == ORDER);
 
   /* allocate scratch space for computations */
   dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise> W(DEGREE + 3,
@@ -58,7 +64,9 @@ int main(int argc, char *argv[]) {
     stokes.C(0, 0) = 0e0;
     stokes.C(1, 0) = stokes.C(1, 1) = stokes.S(1, 1) = 0e0;
 
-    /* compute acceleration for given epoch/position */
+    /* compute acceleration for given epoch/position; this is the 'correct' 
+     * call, i.e. what we should be doing. 
+     */
     if (dso::sh2gradient_cunningham(stokes, in.xyz, a, g, DEGREE, ORDER, -1, -1,
                                     &W, &M)) {
       fprintf(stderr, "ERROR Failed computing acceleration/gradient\n");

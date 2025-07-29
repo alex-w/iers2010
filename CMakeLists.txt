@@ -25,6 +25,9 @@ option(BUILD_COSTG "Build costg binaries (requires iers library)" ON)
 # Define the path to costgdata dir, to build costg tests
 set(COSTG_DATA_DIR "" CACHE PATH "Path to COST-G benchmark data (optional)")
 
+# Enable benchmark tests (OFF by default)
+option(ENABLE_BENCHMARKS "Build benchmark executables" OFF)
+
 # If "-DSPARSE_ADMITTANCE_MATRIX=ON" is passed in, define 
 # SPARSE_ADMITTANCE_MATRIX
 if(SPARSE_ADMITTANCE_MATRIX)
@@ -90,6 +93,25 @@ if(BUILD_COSTG)
   add_subdirectory(costg-benchmark/bin)
 endif()
 
+if(ENABLE_BENCHMARKS)
+  include(FetchContent)
+
+  # These must be set BEFORE FetchContent_MakeAvailable
+  set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "Disable benchmark self-tests")
+  set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE BOOL "Disable benchmark gtest-based tests")
+  set(BENCHMARK_DOWNLOAD_DEPENDENCIES OFF CACHE BOOL "Don't download gtest")
+
+  # Google Benchmark
+  FetchContent_Declare(
+    benchmark
+    GIT_REPOSITORY https://github.com/google/benchmark.git
+    GIT_TAG v1.8.3
+  )
+  FetchContent_MakeAvailable(benchmark)
+
+  # Add benchmark subdirectory
+  add_subdirectory(test/benchmark)
+endif()
 
 # The tests
 if(BUILD_TESTING)

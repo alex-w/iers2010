@@ -180,7 +180,14 @@ int ynm(const Eigen::Vector3d &point, const dso::StokesCoeffs &CS,
         std::vector<double> &y, dso::StokesCoeffs &cs, int max_degree = -1,
         int max_order = -1) noexcept;
 
+[[nodiscard]]
 int sh_basis_cs_exterior(
+    const Eigen::Vector3d &rsta, int max_degree, int max_order,
+    dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise> &C,
+    dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise>
+        &S) noexcept;
+[[nodiscard]]
+int sh_basis_cs_exterior2(
     const Eigen::Vector3d &rsta, int max_degree, int max_order,
     dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise> &C,
     dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise>
