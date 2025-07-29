@@ -95,6 +95,8 @@ endif()
 
 if(ENABLE_BENCHMARKS)
   include(FetchContent)
+  # Add a compile definition so C++ code can use #ifdef ENABLE_BENCHMARKS
+  add_compile_definitions(ENABLE_BENCHMARKS)
 
   # These must be set BEFORE FetchContent_MakeAvailable
   set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "Disable benchmark self-tests")

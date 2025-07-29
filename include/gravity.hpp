@@ -180,18 +180,56 @@ int ynm(const Eigen::Vector3d &point, const dso::StokesCoeffs &CS,
         std::vector<double> &y, dso::StokesCoeffs &cs, int max_degree = -1,
         int max_order = -1) noexcept;
 
+/** @brief  Compute the spherical harmonic basis functions Cnm, Snm.
+ *
+ * This function computes the spherical harmonic basis functions Cnm, Snm up
+ * to a specified degree n, iand order m, evaluated at a 3D point in space.
+ *
+ * These functions are the real-valued solid spherical harmonics, commonly
+ * used in geodesy and gravity field modeling.
+ *
+ * Computes the real solid spherical harmonics (4π normalized):
+ * Cnm = (1/r**(n+1)) cos(mλ) Pnm(cosθ)
+ * Snm = (1/r**(n+1)) cos(mλ) Pnm(cosθ)
+ *
+ * At the end of the function
+ * C(n,m) holds the real-valued cosine basis Cnm
+ * S(n,m) holds the real-valued sine basis Snm
+ *
+ * These can then be multiplied by the corresponding cnm, snm gravity field
+ * coefficients to compute potential, acceleration, etc.
+ *
+ * @param[in] rsta The point of computation; should be exterior to Earth, 
+ *                 given in geocentric cartesian coordinates, ECEF [m]. 
+ *                 Normally, if you have a point r on or out of a sphere of 
+ *                 radius R, you should pass in r/|R|.
+ * @param[in] max_degree Max degree of computation.
+ * @param[in] max_order  Max order of computation.
+ * @param[in] C    A lower triangular, column-wise matrix where the Cnm
+ *                 coefficients are stored after computation. Its size should 
+ *                 be large enough to hold the computed coefficients, i.e. 
+ *                 (C.rows() >= max_degree) && (C.cols() >= max_degree).
+ * @param[in] S    A lower triangular, column-wise matrix where the Snm
+ *                 coefficients are stored after computation. Its size should 
+ *                 be large enough to hold the computed coefficients, i.e. 
+ *                 (S.rows() >= max_degree) && (S.cols() >= max_degree).
+ * @return         Anything other than zero denotes an error.
+ */
 [[nodiscard]]
 int sh_basis_cs_exterior(
     const Eigen::Vector3d &rsta, int max_degree, int max_order,
     dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise> &C,
     dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise>
         &S) noexcept;
+
+#ifdef ENABLE_BENCHMARKS
 [[nodiscard]]
 int sh_basis_cs_exterior2(
     const Eigen::Vector3d &rsta, int max_degree, int max_order,
     dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise> &C,
     dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise>
         &S) noexcept;
+#endif
 
 } /* namespace gravity */
 
