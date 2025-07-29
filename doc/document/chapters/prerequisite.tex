@@ -76,6 +76,11 @@ library (C implementation). They are build by default if :
   \item the SOFA library is available on your system (as \texttt{sofa\_c})
 \end{itemize}
 
+\noindent\textbf{Benchmark Tests}: Benchmark tests are not build by default; you can trigger their building via the 
+\texttt{-DENABLE_BENCHMARKS=ON} option. Note that these kind of tests are not included in \texttt{ctest} (i.e. 
+won't run automatically after calling \texttt{ctest --test-dir build}). Instead, you should run them manually. 
+They should be located at \texttt{build/test/benchmark}.
+
 \subsection{Build Options for Developers}
 \begin{description}
   \item[SPARSE\_ADMITTANCE\_MATRIX] uses sparse matrices (instead of dense ones) on a few different locations 
