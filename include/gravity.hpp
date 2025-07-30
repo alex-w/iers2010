@@ -167,11 +167,48 @@ int sh2gradient_cunningham(
     dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise> *M =
         nullptr) noexcept;
 
-/* ----------------------------------------------------------------- */
-/* ---------------------------- NEW STUFF -------------------------- */
-/* ----------------------------------------------------------------- */
 namespace gravity {
 
+/** @brief Compute surface displacement due to a surface load.
+ *
+ * Computes the 3D displacement vector, dr, of a point on the Earth's surface 
+ * due to surface mass loading, expressed in an Earth-centered coordinate 
+ * frame. 
+ *
+ * dr = dr_radial + dr_tangential
+ * dr_radial     = Σ h(n)/g * V(n) * r
+ * dr_tangential = Σ l(n)/g * (grad V(n) - <grad V(n), r> * r)
+ *
+ * dr       : Total displacement vector at the observation point [m]
+ * V(n)     : Load potential at spherical harmonic degree n
+ * grad V(n): Gradient (vector) of V(n) at the observation point
+ * g        : Local acceleration due to gravity
+ * h(n),l(n): Load Love numbers for degree n (for vertical and horizontal 
+ *            deformation respectively)
+ * r        : Local upward (radial) unit vector
+ *
+ * @param[in] point A point on or outside the Earth, specified by its 
+ *            geocentric cartesian coordinates (ITRF) [m]
+ * @param[in] cs Stokes coefficients of the surface load, the 'source' of the 
+ *            displacement
+ * @param[out] dr Displacement vector at the point of interest, in cartesian 
+ *            coordiantes [m]. Hence, the point will have moved to 
+ *            new_location = point + dr 
+ * @param[out] gravity Gravity acceleration at the point of interest (since we 
+ *            are computing it, we might as well return it!) in [m/s^2]
+ * @param[out] potential The (total) gravitational potential at the point of 
+ *            interest (since we are computing it, we might as well return 
+ *            it!) in [m/s^2]
+ * @param[in] max_degree Max degree of spherical harmonics expansion. Should 
+ *            be max_degree <= cs.max_degree().
+ * @param[in] max_order Max order of spherical harmonics expansion. Should 
+ *            be max_order <= cs.max_order() and max_order <= max_degree.
+ * @param[inout] M Scratch space to be used by the function. The matrix should 
+ *            have size at least >= max_degree+2
+ * @param[inout] W Scratch space to be used by the function. The matrix should 
+ *            have size at least >= max_degree+2
+ * @return Anything other than zero denotes an error.
+ */
 [[nodiscard]]
 int sh_deformation(
     const Eigen::Vector3d &point, const dso::StokesCoeffs &cs,
@@ -180,10 +217,6 @@ int sh_deformation(
     dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise> &M,
     dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise>
         &W) noexcept;
-
-int ynm(const Eigen::Vector3d &point, const dso::StokesCoeffs &CS,
-        std::vector<double> &y, dso::StokesCoeffs &cs, int max_degree = -1,
-        int max_order = -1) noexcept;
 
 /** @brief  Compute the spherical harmonic basis functions Cnm, Snm.
  *
@@ -238,6 +271,36 @@ int sh_basis_cs_exterior2(
 
 } /* namespace gravity */
 
+/** @brief Computes the 3D displacement vector due to surface mass loading.
+ *
+ * This is just a wrapper for dso::gravity::sh_deformation
+ *
+ * @param[in] point A point on or outside the Earth, specified by its 
+ *            geocentric cartesian coordinates (ITRF) [m]
+ * @param[in] cs Stokes coefficients of the surface load, the 'source' of the 
+ *            displacement
+ * @param[out] dr Displacement vector at the point of interest, in cartesian 
+ *            coordiantes [m]. Hence, the point will have moved to 
+ *            new_location = point + dr 
+ * @param[out] gravity Gravity acceleration at the point of interest (since we 
+ *            are computing it, we might as well return it!) in [m/s^2]
+ * @param[out] potential The (total) gravitational potential at the point of 
+ *            interest (since we are computing it, we might as well return 
+ *            it!) in [m/s^2]
+ * @param[in] max_degree Max degree of spherical harmonics expansion. Should 
+ *            be max_degree <= cs.max_degree(). If set to a negative number, 
+ *            cs.max_degree() will be used.
+ * @param[in] max_order Max order of spherical harmonics expansion. Should 
+ *            be max_order <= cs.max_order() and max_order <= max_degree. If 
+ *            set to a negative number, cs.max_order() will be used.
+ * @param[inout] M Scratch space to be used by the function. The matrix should 
+ *            have size at least >= max_degree+2. If not provided, it will be 
+ *            allocated.
+ * @param[inout] W Scratch space to be used by the function. The matrix should 
+ *            have size at least >= max_degree+2. If not provided, it will be 
+ *            allocated.
+ * @return Anything other than zero denotes an error.
+ */
 [[nodiscard]] int sh_deformation(
     const Eigen::Vector3d &rsta, const dso::StokesCoeffs &cs,
     Eigen::Vector3d &gravity, double &potential, Eigen::Vector3d &dr,
