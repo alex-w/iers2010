@@ -30,9 +30,9 @@ set(NO_ARGS_SOURCES
   stokes_add_cs2.cpp
   stokes_add_cs3.cpp
   alfs1.cpp
-  #itrs2gcrs_velocity.cpp
+  # itrs2gcrs_velocity.cpp
   c2i_vel.cpp
-  make_dehanttideinel_input.cpp
+  # make_dehanttideinel_input.cpp
   solid_earth_tide_displacement.cpp
 )
 

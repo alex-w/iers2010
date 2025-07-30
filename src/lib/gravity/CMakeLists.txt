@@ -7,4 +7,5 @@ target_sources(iers
     ${CMAKE_SOURCE_DIR}/src/lib/gravity/sh_basis_functions.cpp
     ${CMAKE_SOURCE_DIR}/src/lib/gravity/load_love_numbers.cpp
     ${CMAKE_SOURCE_DIR}/src/lib/gravity/sh_basis_cs_exterior.cpp
+    ${CMAKE_SOURCE_DIR}/src/lib/gravity/sh_deformation.cpp
 )

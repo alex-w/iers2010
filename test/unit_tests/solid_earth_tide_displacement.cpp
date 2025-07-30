@@ -9044,10 +9044,6 @@ int main() {
     /* compute displacement */
     auto dr = set.displacement(tt, tt.tt2ut1(Data[i].dut1), rsta, rmon, rsun, fargs);
 
-    //printf("%+.4f %+.4f %+.4f\n", dr(0) - Data[i].res[0],
-    //       dr(1) - Data[i].res[1], dr(2) - Data[i].res[2]);
-    //printf("%.15e %.15e %.15e\n", dr(0), dr(1), dr(2));
-
     assert( std::abs(dr(0) - Data[i].res[0]) < TOLERANCE );
     assert( std::abs(dr(1) - Data[i].res[1]) < TOLERANCE );
     assert( std::abs(dr(2) - Data[i].res[2]) < TOLERANCE );

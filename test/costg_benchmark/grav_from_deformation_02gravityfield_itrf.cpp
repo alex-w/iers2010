@@ -8,9 +8,9 @@
 #endif
 #include <cassert>
 
-/* This test is a copy of the 02(itrf) check, but instead of using the 
- * 'fitting' function to compute gravity, it uses the 'deformation' function. 
- * This makes sure that gravity computed in the deformation function is 
+/* This test is a copy of the 02(itrf) check, but instead of using the
+ * 'fitting' function to compute gravity, it uses the 'deformation' function.
+ * This makes sure that gravity computed in the deformation function is
  * the same as the one computed in the cunningham_normalized function.
  */
 
@@ -64,8 +64,8 @@ int main(int argc, char *argv[]) {
     stokes.C(0, 0) = 0e0;
     stokes.C(1, 0) = stokes.C(1, 1) = stokes.S(1, 1) = 0e0;
 
-    /* compute acceleration for given epoch/position; this is the 'correct' 
-     * call, i.e. what we should be doing. 
+    /* compute acceleration for given epoch/position; this is the 'correct'
+     * call, i.e. what we should be doing.
      */
     if (dso::sh2gradient_cunningham(stokes, in.xyz, a, g, DEGREE, ORDER, -1, -1,
                                     &W, &M)) {
@@ -76,20 +76,26 @@ int main(int argc, char *argv[]) {
     printf("[Results (1)] %.12f %.12f %.12f\n", std::abs(acc->axyz(0) - a(0)),
            std::abs(acc->axyz(1) - a(1)), std::abs(acc->axyz(2) - a(2)));
 
+    assert(std::abs(acc->axyz(0) - a(0)) < TOLERANCE);
+    assert(std::abs(acc->axyz(1) - a(1)) < TOLERANCE);
+    assert(std::abs(acc->axyz(2) - a(2)) < TOLERANCE);
+
     /* compute acceleration for given epoch/position (we use the deformation
      * function here, but will only check the gravity results)
      */
     double potential;
     Eigen::Vector3d dr;
-    if (dso::sh_deformation(in.xyz, stokes, DEGREE, ORDER, a, potential, dr)) {
+    if (dso::sh_deformation(in.xyz, stokes, a, potential, dr, DEGREE, ORDER, &W,
+                            &M)) {
       fprintf(stderr, "ERROR Failed computing acceleration/gradient\n");
       return 1;
     }
 
-    printf("[Results (2)] %.12f %.12f %.12f %.2f %.2f %.2f\n",
-           std::abs(acc->axyz(0) - a(0)), std::abs(acc->axyz(1) - a(1)),
-           std::abs(acc->axyz(2) - a(2)), dr(0) * 1e3, dr(1) * 1e3,
-           dr(2) * 1e3);
+    printf(
+        "[Results (2)] %.12f %.12f %.12f V=%.12f dr=(%.2f, %.2f, %.2f)[mm]\n",
+        std::abs(acc->axyz(0) - a(0)), std::abs(acc->axyz(1) - a(1)),
+        std::abs(acc->axyz(2) - a(2)), potential, dr(0) * 1e3, dr(1) * 1e3,
+        dr(2) * 1e3);
 
     /* get COSTG result */
     if (acc->epoch != in.epoch) {

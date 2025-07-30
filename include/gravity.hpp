@@ -171,10 +171,15 @@ int sh2gradient_cunningham(
 /* ---------------------------- NEW STUFF -------------------------- */
 /* ----------------------------------------------------------------- */
 namespace gravity {
-int sh_deformation(const Eigen::Vector3d &point, const dso::StokesCoeffs &CS,
-                   Eigen::Vector3d &dr, Eigen::Vector3d &gravity,
-                   double &potential, int max_degree = -1,
-                   int max_order = -1) noexcept;
+
+[[nodiscard]]
+int sh_deformation(
+    const Eigen::Vector3d &point, const dso::StokesCoeffs &cs,
+    Eigen::Vector3d &dr, Eigen::Vector3d &gravity, double &potential,
+    int max_degree, int max_order,
+    dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise> &M,
+    dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise>
+        &W) noexcept;
 
 int ynm(const Eigen::Vector3d &point, const dso::StokesCoeffs &CS,
         std::vector<double> &y, dso::StokesCoeffs &cs, int max_degree = -1,
@@ -199,19 +204,19 @@ int ynm(const Eigen::Vector3d &point, const dso::StokesCoeffs &CS,
  * These can then be multiplied by the corresponding cnm, snm gravity field
  * coefficients to compute potential, acceleration, etc.
  *
- * @param[in] rsta The point of computation; should be exterior to Earth, 
- *                 given in geocentric cartesian coordinates, ECEF [m]. 
- *                 Normally, if you have a point r on or out of a sphere of 
+ * @param[in] rsta The point of computation; should be exterior to Earth,
+ *                 given in geocentric cartesian coordinates, ECEF [m].
+ *                 Normally, if you have a point r on or out of a sphere of
  *                 radius R, you should pass in r/|R|.
  * @param[in] max_degree Max degree of computation.
  * @param[in] max_order  Max order of computation.
  * @param[in] C    A lower triangular, column-wise matrix where the Cnm
- *                 coefficients are stored after computation. Its size should 
- *                 be large enough to hold the computed coefficients, i.e. 
+ *                 coefficients are stored after computation. Its size should
+ *                 be large enough to hold the computed coefficients, i.e.
  *                 (C.rows() >= max_degree) && (C.cols() >= max_degree).
  * @param[in] S    A lower triangular, column-wise matrix where the Snm
- *                 coefficients are stored after computation. Its size should 
- *                 be large enough to hold the computed coefficients, i.e. 
+ *                 coefficients are stored after computation. Its size should
+ *                 be large enough to hold the computed coefficients, i.e.
  *                 (S.rows() >= max_degree) && (S.cols() >= max_degree).
  * @return         Anything other than zero denotes an error.
  */
@@ -233,53 +238,14 @@ int sh_basis_cs_exterior2(
 
 } /* namespace gravity */
 
-inline int sh_deformation(const Eigen::Vector3d &rsta,
-                          const dso::StokesCoeffs &cs, int max_degree,
-                          int max_order, Eigen::Vector3d &gravity,
-                          double &potential, Eigen::Vector3d &dr) noexcept {
-
-  /* set (if needed) maximum degree and order of expansion */
-  if (max_degree < 0)
-    max_degree = cs.max_degree();
-  if (max_order < 0)
-    max_order = cs.max_order();
-
-  if (max_order > max_degree) {
-    fprintf(stderr,
-            "[ERROR] Invalid degree/order for spherical harmonics expansion! "
-            "(traceback: %s)\n",
-            __func__);
-    return 1;
-  }
-
-  /* check computation degree and order w.r.t. the Stokes coeffs */
-  if (max_degree > cs.max_degree()) {
-    fprintf(stderr,
-            "[ERROR] Requesting computing SH acceleration of degree %d, but "
-            "Stokes coefficients are of size %dx%d (traceback: %s)\n",
-            max_degree, cs.max_degree(), cs.max_order(), __func__);
-    return 1;
-  }
-  if (max_order > cs.max_order()) {
-    fprintf(stderr,
-            "[ERROR] Requesting computing SH acceleration of order %d, but "
-            "Stokes coefficients are of size %dx%d (traceback: %s)\n",
-            max_order, cs.max_degree(), cs.max_order(), __func__);
-    return 1;
-  }
-
-  /* compute deformation */
-  if (gravity::sh_deformation(rsta, cs, dr, gravity, potential, max_degree,
-                              max_order)) {
-    fprintf(stderr,
-            "[ERROR] Failed computing (surface) deformation from SH "
-            "expansion! (traceback: %s)\n",
-            __func__);
-    return 5;
-  }
-
-  return 0;
-}
+[[nodiscard]] int sh_deformation(
+    const Eigen::Vector3d &rsta, const dso::StokesCoeffs &cs,
+    Eigen::Vector3d &gravity, double &potential, Eigen::Vector3d &dr,
+    int max_degree = -1, int max_order = -1,
+    dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise> *M =
+        nullptr,
+    dso::CoeffMatrix2D<dso::MatrixStorageType::LwTriangularColWise> *W =
+        nullptr) noexcept;
 
 } /* namespace dso */
 
