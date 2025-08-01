@@ -5,7 +5,7 @@
 
 using namespace dso;
 
-int main(int argc, char *argv[]) {
+int compute_displacement(int argc, char *argv[]) {
   if (argc != 4) {
     fprintf(stderr, "Usage: [eopc04.1962-now] [de421.bsp] [naif*.tls]\n");
     return 1;
@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
   SolidEarthTide set(3.986004418e14, 6378136.6e0, 4.9048695e12,
                      1.32712442099e20);
   
-  Eigen::Matrix<double, 3, 1> rmon, rsun;
+  Eigen::Vector3d rmon, rsun;
   auto tt = start;
   while (tt<end) {
     

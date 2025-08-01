@@ -115,6 +115,9 @@ if(ENABLE_BENCHMARKS)
   add_subdirectory(test/benchmark)
 endif()
 
+# Python bindings
+add_subdirectory(pybind)
+
 # The tests
 if(BUILD_TESTING)
   include(CTest)
