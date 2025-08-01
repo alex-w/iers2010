@@ -1,7 +1,9 @@
-#include "fundarg.hpp"
-#include "solid_earth_tide.hpp"
+#include "datetime/datetime_write.hpp"
 #include "earth_rotation.hpp"
+#include "fundarg.hpp"
+#include "iau.hpp"
 #include "planets.hpp"
+#include "solid_earth_tide.hpp"
 
 using namespace dso;
 
@@ -36,23 +38,47 @@ int compute_displacement(int argc, char *argv[]) {
   /* setup a SolidEarthTide instance */
   SolidEarthTide set(3.986004418e14, 6378136.6e0, 4.9048695e12,
                      1.32712442099e20);
-  
+
+  char buf[64];
   Eigen::Vector3d rmon, rsun;
   auto tt = start;
-  while (tt<end) {
-    
-    /* Fundamental arguments (IERS 2003) */
-    const double fa[14] = {
-        fal03(tt),  falp03(tt), faf03(tt),  fad03(tt),  faom03(tt),
-        fame03(tt), fave03(tt), fae03(tt),  fama03(tt), faju03(tt),
-        fasa03(tt), faur03(tt), fane03(tt), fapa03(tt),
-    };
+  /* iterate through [start, end) with step=30[sec] */
+  while (tt < end) {
 
     /* EOPS at time of request */
     EopRecord eop;
     if (EopSeries::out_of_bounds(eops.interpolate(tt, eop))) {
       fprintf(stderr, "Failed to interpolate: Epoch is out of bounds!\n");
       return 1;
+    }
+
+    /* compute GMST using an approximate value for UT1 (linear interpolation) */
+    double dut1_approx;
+    eops.approx_dut1(tt, dut1_approx);
+    const double gmst = dso::gmst(tt, tt.tt2ut1(dut1_approx));
+
+    /* compute fundamental arguments at given epoch */
+    double fargs[14];
+    dso::fundarg(tt, fargs);
+
+    /* add libration effect [micro as] */
+    {
+      double dxp, dyp, dut1, dlod;
+      dso::deop_libration(fargs, gmst, dxp, dyp, dut1, dlod);
+      eop.xp() += dxp * 1e-6;
+      eop.yp() += dyp * 1e-6;
+      eop.dut() += dut1 * 1e-6;
+      eop.lod() += dlod * 1e-6;
+    }
+
+    /* add ocean tidal effect [micro as] */
+    {
+      double dxp, dyp, dut1, dlod;
+      dso::deop_ocean_tide(fargs, gmst, dxp, dyp, dut1, dlod);
+      eop.xp() += dxp * 1e-6;
+      eop.yp() += dyp * 1e-6;
+      eop.dut() += dut1 * 1e-6;
+      eop.lod() += dlod * 1e-6;
     }
 
     /* get Sun+Moon position in ICRF */
@@ -65,16 +91,18 @@ int compute_displacement(int argc, char *argv[]) {
       return 2;
     }
 
-    /* transformation quaternion */
-    const auto q = dso::itrs2gcrs_quaternion(tt, eop);
-    rsun = q.inverse() * rsun;
-    rmon = q.inverse() * rmon;
+    /* get the rotation matrix, i.e. [TRS] = q * [CRS] */
+    Eigen::Quaterniond q = dso::c2i06a(tt, eop);
+    rsun = q * rsun;
+    rmon = q * rmon;
 
     /* compute deformation (cartesian) */
-    auto dr = set.displacement(tt, tt.tt2ut1(eop.dut()), rsta, rmon, rsun, fa);
+    auto dr =
+        set.displacement(tt, tt.tt2ut1(eop.dut()), rsta[0], rmon, rsun, fargs);
 
-    printf("%.9f %.4f %.4f %.4f %.4f\n", tt.imjd() + tt.fractional_days(),
-           dr(0), dr(1), dr(2), dr.norm());
+    printf("%s %.4f %.4f %.4f %.4f\n",
+           to_char<YMDFormat::YYYYMMDD, HMSFormat::HHMMSS>(tt, buf), dr(0),
+           dr(1), dr(2), dr.norm());
 
     /* next date */
     tt.add_seconds(FractionalSeconds(30));
