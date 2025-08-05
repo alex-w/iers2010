@@ -115,8 +115,8 @@ if(ENABLE_BENCHMARKS)
   add_subdirectory(test/benchmark)
 endif()
 
-# Python bindings
-add_subdirectory(pybind)
+# Executables
+add_subdirectory(bin)
 
 # The tests
 if(BUILD_TESTING)

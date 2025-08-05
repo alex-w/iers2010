@@ -4,7 +4,6 @@ target_sources(iers
     ${CMAKE_SOURCE_DIR}/src/lib/gravity/point_mass_acceleration.cpp
     ${CMAKE_SOURCE_DIR}/src/lib/gravity/sh_cunningham_normalized_gradient.cpp
     ${CMAKE_SOURCE_DIR}/src/lib/gravity/normalized_legendre_factors.cpp
-    ${CMAKE_SOURCE_DIR}/src/lib/gravity/sh_basis_functions.cpp
     ${CMAKE_SOURCE_DIR}/src/lib/gravity/load_love_numbers.cpp
     ${CMAKE_SOURCE_DIR}/src/lib/gravity/sh_basis_cs_exterior.cpp
     ${CMAKE_SOURCE_DIR}/src/lib/gravity/sh_deformation.cpp
