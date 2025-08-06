@@ -1,7 +1,7 @@
 /** @file
  * Solid Earth Tide Model & computation for Geodesy.
- * Solid Earth Tide has an effect both on the geopotential (expressible via 
- * spherical harmonics coefficients) and on points/sites on the Earth's 
+ * Solid Earth Tide has an effect both on the geopotential (expressible via
+ * spherical harmonics coefficients) and on points/sites on the Earth's
  * surface, i.e. causing deformation.
  * Both effects are treated here in speration.
  */
@@ -9,11 +9,11 @@
 #ifndef __DSO_SOLID_EARTH_TIDE_HPP__
 #define __DSO_SOLID_EARTH_TIDE_HPP__
 
+#include "datetime/calendar.hpp"
+#include "eigen3/Eigen/Eigen"
+#include "geodesy/transformations.hpp"
 #include "iersconst.hpp"
 #include "stokes_coefficients.hpp"
-#include "datetime/calendar.hpp"
-#include "geodesy/transformations.hpp"
-#include "eigen3/Eigen/Eigen"
 
 namespace dso {
 
@@ -81,32 +81,32 @@ private:
    *             dS = 0,S21,S22,0,S31,S32,S33,0,S41,S42,0,0
    */
   int potential_step1(const Eigen::Matrix<double, 3, 1> &rMoon,
-                             const Eigen::Matrix<double, 3, 1> &rSun,
-                             std::array<double, 12> &dC,
-                             std::array<double, 12> &dS) noexcept;
+                      const Eigen::Matrix<double, 3, 1> &rSun,
+                      std::array<double, 12> &dC,
+                      std::array<double, 12> &dS) noexcept;
 
   /* @brief Compute the Step-2 effect of Solid Earth Tides on geopotential
    *  coefficient corrections ΔC_{2m} and ΔS_{2m}.
    *
-   * Compute the Step-2 effect/corrections of Solid Earth tides, as described 
-   * in IERS 2010, Sec. 6.2.1 (Eq. 6.8a through Eq. 6.7e). 
-   * These corrections affect only the degree n=2 geopotential coefficients 
-   * (i.e. C20, C21, C21, S21 and S22) and are used to apply small, frequency 
-   * dependent corrections to the Step-1 geopotential coeffs (ΔC and ΔS). 
-   * These are computed as the sums of contributions from a number of tidal 
+   * Compute the Step-2 effect/corrections of Solid Earth tides, as described
+   * in IERS 2010, Sec. 6.2.1 (Eq. 6.8a through Eq. 6.7e).
+   * These corrections affect only the degree n=2 geopotential coefficients
+   * (i.e. C20, C21, C21, S21 and S22) and are used to apply small, frequency
+   * dependent corrections to the Step-1 geopotential coeffs (ΔC and ΔS).
+   * These are computed as the sums of contributions from a number of tidal
    * constituents belonging to the respective bands.
    *
    * @param[in] mjdtt  Time/epoch of computation in [TT]
    * @param[in] mjdut1 Time/epoch of computation in [UT1]
-   * @param[in] delaunay_args Fundamental/Delaunay arguments at the time of 
+   * @param[in] delaunay_args Fundamental/Delaunay arguments at the time of
    *            computation, i.e. [l, lp, f, d, Ω] in [rad]
-   * @param[out] dC20, dC21, dS21, dC22, dS22 Step-2 corrections for the 
+   * @param[out] dC20, dC21, dS21, dC22, dS22 Step-2 corrections for the
    *            respective geopotential coefficients.
    */
   int potential_step2(const MjdEpoch &mjdtt, const MjdEpoch &mjdut1,
-                             const double *const delaunay_args, double &dC20,
-                             double &dC21, double &dS21, double &dC22,
-                             double &dS22) const noexcept;
+                      const double *const delaunay_args, double &dC20,
+                      double &dC21, double &dS21, double &dC22,
+                      double &dS22) const noexcept;
 
   /** @brief Compute Step-1 displacement due to solid earth tides, according to
    *   IERS 2010.
@@ -115,19 +115,19 @@ private:
    *  + Displacement due to degree n = 2,3 tide (in-phase).
    *    The formulation here follows the IERS 2010 standrads, Section 7.1.1.1
    *    Conventional model for solid Earth tides.
-   *    This function treats the Step-1 in-phase corrections for degrees 
+   *    This function treats the Step-1 in-phase corrections for degrees
    *    n=2,3 following Equations (5) and (6) respectively.
    *
    *  + Displacement due to degree n=2 tide (out-of-phase) and the contribution
    *    from latitude dependence.
    *    The formulation here follows the IERS 2010 standrads, Section 7.1.1.1
    *    Conventional model for solid Earth tides.
-   *    This function treats the Step-1 out-of-phase corrections for degree 
-   *    n=2, following Equations (10) and (11) for the diurnal and 
+   *    This function treats the Step-1 out-of-phase corrections for degree
+   *    n=2, following Equations (10) and (11) for the diurnal and
    *    semi-diurnal tides respectively.
-   * 
-   *  + Additionally, the function add the contribution from latitude 
-   *    dependence (Equations (8) and (9)) for the diurnal and semi-diurnal 
+   *
+   *  + Additionally, the function add the contribution from latitude
+   *    dependence (Equations (8) and (9)) for the diurnal and semi-diurnal
    *    band.
    *
    * @param[in] rsta  ECEF, cartesian position vector of site/point on Earth [m]
@@ -155,23 +155,23 @@ private:
       const dso::SolidEarthTide::PointSphericalTrigs &tMoon,
       const dso::SolidEarthTide::PointSphericalTrigs &tSun) noexcept;
 
-  /** This function computes corrections to Step-1 Solid Earth tide -induced 
-   * displacement at a given point, due to frequency dependence of Love 
+  /** This function computes corrections to Step-1 Solid Earth tide -induced
+   * displacement at a given point, due to frequency dependence of Love
    * and Shida numbers.
-   * Both diurnal (for degree n=2) and long-period tides (n=2) are considered 
+   * Both diurnal (for degree n=2) and long-period tides (n=2) are considered
    * here.
    *
-   * The model follows IERS 2010 Conventions, Section 7.1.1.1 Conventional 
-   * model for solid Earth tides. Equations involved are (mainly) Eq. 12 and 
-   * Eq. 13, while the considered frequencies are taken from Tables 7.3a and 
+   * The model follows IERS 2010 Conventions, Section 7.1.1.1 Conventional
+   * model for solid Earth tides. Equations involved are (mainly) Eq. 12 and
+   * Eq. 13, while the considered frequencies are taken from Tables 7.3a and
    * 7.3b.
    *
    * @param[in] mjdtt  Time/epoch of computation in [TT]
    * @param[in] mjdut1 Time/epoch of computation in [UT1]
    * @param[in] rsta ECEF, cartesian coordinates of site/point on Earth [m]
-   * @param[in] tSta An instance of type PointSphericalTrigs, holding trig 
+   * @param[in] tSta An instance of type PointSphericalTrigs, holding trig
    *            numbers for rsta
-   * @param[in] delaunay_args Fundamental/Delaunay arguments at the time of 
+   * @param[in] delaunay_args Fundamental/Delaunay arguments at the time of
    *            computation, i.e. [l, lp, f, d, Ω] in [rad]
    * @return Displacement vector in local tangent coordinates, where the
    *         Up is in the radial (not vertical) direction and East and North
@@ -189,14 +189,15 @@ public:
    *
    * @param GMearth Standard gravitational parameter μ=GM for the Earth in
    *                [m^2/s^2]; default value from IERS 2010.
-   * @param Rearth Equatorial radius of Earth [m]; ; default value from 
+   * @param Rearth Equatorial radius of Earth [m]; ; default value from
    *               IERS 2010.
-   * @param GMmoon Standard gravitational parameter μ=GM for the Moon in 
+   * @param GMmoon Standard gravitational parameter μ=GM for the Moon in
    *               [m^2/s^2]; default JPL DE421 value.
-   * @param GMsun  Standard gravitational parameter μ=GM for the Sun in 
+   * @param GMsun  Standard gravitational parameter μ=GM for the Sun in
    *               [m^2/s^2]; default JPL DE421 value.
    */
-  SolidEarthTide(double GMearth = ::iers2010::GMe, double Rearth = ::iers2010::Re,
+  SolidEarthTide(double GMearth = ::iers2010::GMe,
+                 double Rearth = ::iers2010::Re,
                  double GMsun = 1.32712442076e20,
                  double GMmoon = 0.49028010560e13) noexcept
       : mSEratio(GMsun / GMearth), mMEratio(GMmoon / GMearth),
@@ -205,26 +206,26 @@ public:
   /** Get the stokes coefficients of the intsance */
   const StokesCoeffs &stokes_coeffs() const noexcept { return mcs; }
 
-  /** Compute corrections to geopotential coefficients (ΔC, ΔS) due to Solid 
+  /** Compute corrections to geopotential coefficients (ΔC, ΔS) due to Solid
    * Earth tide according to IERS 2010.
    *
    * This function follows the IERS 2010 model, using a two-step approach.
-   * Both Step-1 (due to Sun and Moon) and Step-2 (frequency-dependent) 
+   * Both Step-1 (due to Sun and Moon) and Step-2 (frequency-dependent)
    * corrections are considered.
-   * The degree/order corrections actually computed span n=2,3,4; for n=4, 
-   * max(m)=2 (i.e. we compute (4,0), (4,1) and (4,2)). However, the instance 
+   * The degree/order corrections actually computed span n=2,3,4; for n=4,
+   * max(m)=2 (i.e. we compute (4,0), (4,1) and (4,2)). However, the instance
    * will hold a Stokes coefficient matrix of (n,m)=(4,4), placing zero values
    * where needed.
-   * After the computation, the instance's m_cnm member will be filled with 
-   * the computed geopotential coefficient corrections (computed here). Hence, 
-   * the m_cnm instance could be added to the values of a geopotential model 
+   * After the computation, the instance's m_cnm member will be filled with
+   * the computed geopotential coefficient corrections (computed here). Hence,
+   * the m_cnm instance could be added to the values of a geopotential model
    * to account for the Solid Earth Tide effect.
    *
    * @param[in] mjdtt  Time/epoch of computation in [TT]
    * @param[in] mjdut1 Time/epoch of computation in [UT1]
    * @param[in] rMoon ECEF coordinates of moon [m]
    * @param[in] rSun  ECEF coordinates of Sun [m]
-   * @param[in] delaunay_args Fundamental/Delaunay arguments at the time of 
+   * @param[in] delaunay_args Fundamental/Delaunay arguments at the time of
    *            computation, i.e. [l, lp, f, d, Ω] in [rad]
    * @return Always 0
    */
@@ -232,27 +233,27 @@ public:
                     const Eigen::Matrix<double, 3, 1> &rMoon,
                     const Eigen::Matrix<double, 3, 1> &rSun,
                     const double *const delaunay_args) noexcept;
-  
+
   /** Compute site displacement due to Solid Earth tide according to IERS 2010.
    *
    * This function follows the IERS 2010 model, using a two-step approach.
-   * Both Step-1 (due to Sun and Moon) and Step-2 (frequency-dependent) 
+   * Both Step-1 (due to Sun and Moon) and Step-2 (frequency-dependent)
    * corrections are considered.
    *
    * @param[in] mjdtt  Time/epoch of computation in [TT]
    * @param[in] mjdut1 Time/epoch of computation in [UT1]
    * @param[in] rMoon ECEF coordinates of moon [m]
    * @param[in] rSun  ECEF coordinates of Sun [m]
-   * @param[in] delaunay_args Fundamental/Delaunay arguments at the time of 
+   * @param[in] delaunay_args Fundamental/Delaunay arguments at the time of
    *            computation, i.e. [l, lp, f, d, Ω] in [rad]
    * @return Always 0
    */
-  Eigen::Matrix<double, 3, 1>
-  displacement(const MjdEpoch &mjdtt, const MjdEpoch &mjdut1,
-               const Eigen::Matrix<double, 3, 1> &rsta,
-               const Eigen::Matrix<double, 3, 1> &rMoon,
-               const Eigen::Matrix<double, 3, 1> &rSun,
-               const double *const delaunay_args) noexcept;
+  // Eigen::Matrix<double, 3, 1>
+  CartesianCrd displacement(const MjdEpoch &mjdtt, const MjdEpoch &mjdut1,
+                            const Eigen::Matrix<double, 3, 1> &rsta,
+                            const Eigen::Matrix<double, 3, 1> &rMoon,
+                            const Eigen::Matrix<double, 3, 1> &rSun,
+                            const double *const delaunay_args) noexcept;
 }; /* SolidEarthTide */
 } /* namespace dso */
 

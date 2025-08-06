@@ -41,10 +41,10 @@ int dso::gravity::sh_deformation(
     Eigen::Vector3d gradVn = Eigen::Vector3d::Zero();
     /* order m=0 */
     {
-      const int m = 0;
+      [[maybe_unused]] const int m = 0;
 
       /* potential */
-      Vn = M(n, m) * cs.C(n, m);
+      Vn = M(n, 0) * cs.C(n, 0);
 
       /* acceleration i.e grad(V) */
       const double wm0 = std::sqrt(static_cast<double>(n + 1) * (n + 1));
@@ -88,7 +88,7 @@ int dso::gravity::sh_deformation(
       }
     } /* done with m's ... */
 
-    gradVn *= std::sqrt((2. * n + 1.) / (2. * n + 3.)) / 2e0 / cs.Re();
+    gradVn *= std::sqrt((2. * n + 1.) / (2. * n + 3.)) / (2e0 * cs.Re());
     /* total gravity vec. (unscalled) */
     gravity += gradVn;
     /* total potential (scalar, unscalled) */
@@ -104,7 +104,7 @@ int dso::gravity::sh_deformation(
   potential *= cs.GM() / cs.Re();
 
   /* scale displacement */
-  dr *= cs.GM() / cs.Re() / gravity.norm();
+  dr *= (1.e0 / gravity.norm());
 
   return 0;
 }

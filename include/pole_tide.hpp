@@ -43,9 +43,9 @@ inline m12Coeffs mcoeffs(const MjdEpoch &t, double xp, double yp) noexcept {
  * A_real, A_imag, B_real and B_imag when the degree and order of the
  * instance are > 2.
  *
- * Note that this is SH (max) degree, hence if you need to allocate a matrix 
+ * Note that this is SH (max) degree, hence if you need to allocate a matrix
  * to hold the coeffs, you should add 1 (SH coeffs go from [0, MAX_DEGREE].).
- * See e.g. the OceanPoleTide constructors and their allocation of A_real, 
+ * See e.g. the OceanPoleTide constructors and their allocation of A_real,
  * A_imag, B_real and B_imag.
  */
 constexpr int MAX_DEGREE_DESAI_2002 = 360;
@@ -54,9 +54,9 @@ constexpr int MAX_DEGREE_DESAI_2002 = 360;
  * A_real, A_imag, B_real and B_imag when the degree and order of the
  * instance are > 2.
  *
- * Note that this is SH (max) order, hence if you need to allocate a matrix 
+ * Note that this is SH (max) order, hence if you need to allocate a matrix
  * to hold the coeffs, you should add 1 (SH coeffs go from [0, MAX_ORDER].).
- * See e.g. the OceanPoleTide constructors and their allocation of A_real, 
+ * See e.g. the OceanPoleTide constructors and their allocation of A_real,
  * A_imag, B_real and B_imag.
  */
 constexpr int MAX_ORDER_DESAI_2002 = 360;
@@ -117,6 +117,24 @@ struct OceanPoleTideDesaiCoeffs {
 }; /* OceanPoleTideDesaiCoeffs */
 
 class PoleTide {
+  /** @brief Compute displacement due to (Earth) Pole Tide according to IERS2010
+   *
+   * Displacement is returned in rectangular cartesian coordinates (x,y,z), in
+   * [m].
+   *
+   * @param[in] t The time of request.
+   * @param[in] xp Pole X-coordinates at t in [arcsec]
+   * @param[in] yp Pole Y-coordinates at t in [arcsec]
+   * @param[in] rsta Reference point spherical coordinates [rad, m], ECEF.
+   * @return Displacement at reference point due to polar tide as described in
+   * IERS2010. The vector is returned in cartesian components and in [m].
+   *
+   * TODO i do not know what time-scale t should be in
+   */
+  static CartesianCrd
+  deformation_impl(const MjdEpoch &t, double xp, double yp,
+                   const SphericalCrdConstView rsta) noexcept;
+
 public:
   /** @brief Geopotential coefficients corrections (ΔC_12 and ΔS_12) due to
    *         (solid earth) pole tide.
@@ -142,10 +160,48 @@ public:
     return 0;
   }
 
-  /**
+  /** @brief Compute displacement due to (Earth) Pole Tide according to IERS2010
+   *
+   * The reference point (i.e. point where we want the displacement at) can be
+   * give in either Cartesian or Spherical coordinates; that is the role of the
+   * template parameter T.
+   *
+   * Displacement is returned in rectangular cartesian coordinates (x,y,z), in
+   * [m].
+   *
+   * @param[in] t The time of request.
+   * @param[in] xp Pole X-coordinates at t in [arcsec]
+   * @param[in] yp Pole Y-coordinates at t in [arcsec]
+   * @param[in] rsta Reference point coordinates, either as rectangular,
+   * cartesian components or spherical. Could be any type of CartesianCrd or
+   * SphericalCrd. Frame is ECEF [m].
+   * @return Displacement at reference point due to polar tide as described in
+   * IERS2010. The vector is returned in cartesian components and in [m].
+   *
+   * TODO i do not know what time-scale t should be in
    */
+  template <typename T>
+#if __cplusplus >= 202002L
+    requires(isSpherical<T> || isCartesian<T>)
+#endif
   static CartesianCrd deformation(const MjdEpoch &t, double xp, double yp,
-                                  const SphericalCrdConstView rsta) noexcept;
+                                  const T &rsta) noexcept {
+#if __cplusplus >= 202002L
+    if constexpr (isSpherical<T>) {
+#else
+    /* no requires/concepts in c++ < 20; make sure we have a correct T type */
+    static_assert(dso::CoordinateTypeTraits<T>::isSpherical ||
+                      dso::CoordinateTypeTraits<T>::isCartesian,
+                  "T must be Spherical or Cartesian coordinate set!");
+    if constexpr (dso::CoordinateTypeTraits<T>::isSpherical) {
+#endif
+      return deformation_impl(t, xp, yp, SphericalCrdConstView(rsta));
+    } else {
+      static_assert(dso::CoordinateTypeTraits<T>::isCartesian);
+      const auto sph = cartesian2spherical<T>(rsta);
+      return deformation_impl(t, xp, yp, SphericalCrdConstView(rsta));
+    }
+  }
 }; /* class poleTide */
 
 class OceanPoleTide {
@@ -174,6 +230,45 @@ class OceanPoleTide {
     return pole_tide_details::parse_desai02_coeffs(
         fn, maxdegree, maxorder, A_real, A_imag, B_real, B_imag);
   }
+
+  /** Compute deformation at a given site to to ocean pole tide.
+   *
+   * The model used to compute the ocean pole tide displacement is given in
+   * Desai 2002 and IERS 2010. To perform the computation, we need model
+   * coefficients which are given (gridded) in the IERS distributed file at
+   * https://iers-conventions.obspm.fr/content/chapter7/additional_info/opoleloadcoefcmcor.txt.gz
+   * Before computing the displacement, users need to get the coefficients off
+   * from the file for the site of interest (see function
+   * get_desai_ocp_deformation_coeffs). The coefficients are passed in using a
+   * OceanPoleTideDesaiCoeffs instance.
+   *
+   * @param[in] t Time of computation
+   * @param[in] xp Pole X-coordinates at t in [arcsec]
+   * @param[in] yp Pole Y-coordinates at t in [arcsec]
+   * @param[in] rsta Spherical coordinates of site of interest
+   * @param[in] coef Model coefficients at the site of interest (interpolated
+   *            from the opoleloadcoefcmcor.txt file; see function
+   *            get_desai_ocp_deformation_coeffs). The coefficients are given
+   *            as a OceanPoleTideDesaiCoeffs instance.
+   * @param[in] Re Equatorial radius of Earth [m]; default value taken from
+   *            IERS 2010.
+   * @param[in] GMe Standard gravitational parameter (μ) of Eart in [m^3s^-2]
+   *            default value taken from IERS 2010.
+   * @param[in] omega Nominal mean Earth's angular velocity [rad/sec]; default
+   *            value taken from IERS 2010.
+   * @param[in] G Constant of gravitation in [m^3/kg/s^2]; default value taken
+   *            from IERS 2010
+   * @param[in] ge Mean equatorial gravity in [m/sec^2]; default value taken
+   *            from IERS 2010
+   * @return Cartesian components of diplacement (ΔX, ΔY, ΔZ) in [m] at the
+   *         site of interest.
+   */
+  static dso::CartesianCrd deformation_impl(
+      const MjdEpoch &t, double xp, double yp,
+      const dso::SphericalCrdConstView rsta,
+      const dso::OceanPoleTideDesaiCoeffs &coef, double Re = ::iers2010::Re,
+      double GM = ::iers2010::GMe, double omega = ::iers2010::OmegaEarth,
+      double G = ::iers2010::G, double ge = ::iers2010::ge) noexcept;
 
 public:
   int max_degree() const noexcept { return mmaxdegree; }
@@ -210,14 +305,14 @@ public:
         mmaxorder(pole_tide_details::MAX_ORDER_DESAI_2002),
         mcs(pole_tide_details::MAX_DEGREE_DESAI_2002,
             pole_tide_details::MAX_ORDER_DESAI_2002),
-        A_real(pole_tide_details::MAX_DEGREE_DESAI_2002+1,
-               pole_tide_details::MAX_DEGREE_DESAI_2002+1),
-        A_imag(pole_tide_details::MAX_DEGREE_DESAI_2002+1,
-               pole_tide_details::MAX_DEGREE_DESAI_2002+1),
-        B_real(pole_tide_details::MAX_DEGREE_DESAI_2002+1,
-               pole_tide_details::MAX_DEGREE_DESAI_2002+1),
-        B_imag(pole_tide_details::MAX_DEGREE_DESAI_2002+1,
-               pole_tide_details::MAX_DEGREE_DESAI_2002+1) {
+        A_real(pole_tide_details::MAX_DEGREE_DESAI_2002 + 1,
+               pole_tide_details::MAX_DEGREE_DESAI_2002 + 1),
+        A_imag(pole_tide_details::MAX_DEGREE_DESAI_2002 + 1,
+               pole_tide_details::MAX_DEGREE_DESAI_2002 + 1),
+        B_real(pole_tide_details::MAX_DEGREE_DESAI_2002 + 1,
+               pole_tide_details::MAX_DEGREE_DESAI_2002 + 1),
+        B_imag(pole_tide_details::MAX_DEGREE_DESAI_2002 + 1,
+               pole_tide_details::MAX_DEGREE_DESAI_2002 + 1) {
     if (this->parse_desai02_coeffs(fn, pole_tide_details::MAX_DEGREE_DESAI_2002,
                                    pole_tide_details::MAX_ORDER_DESAI_2002)) {
       throw std::runtime_error(
@@ -277,10 +372,10 @@ public:
    * @param[in] xp Pole X-coordinates at t in [arcsec]
    * @param[in] yp Pole Y-coordinates at t in [arcsec]
    * @param[in] max_degree Max degree (n) of coefficients to be computed. Note
-   *            that it should be > 0 and <= mmaxdegree. If a negative int is 
+   *            that it should be > 0 and <= mmaxdegree. If a negative int is
    *            given, then we assume max_degree = this->max_degree()
    * @param[in] max_order Max order (n) of coefficients to be computed. Note
-   *            that it should be > 0 and <= mmaxorder. If a negative int is 
+   *            that it should be > 0 and <= mmaxorder. If a negative int is
    *            given, then we assume max_order = this->max_order()
    * @param[in] omega Nominal mean Earth's angular velocity [rad/sec]; default
    *            value taken from IERS 2010.
@@ -293,50 +388,38 @@ public:
    * degree/order specified.
    */
   int stokes_coeffs(const dso::MjdEpoch &t, double xp, double yp,
-                    int max_degree=-1, int max_order=-1,
+                    int max_degree = -1, int max_order = -1,
                     double OmegaEarth = ::iers2010::OmegaEarth,
                     double G = ::iers2010::G,
                     double ge = ::iers2010::ge) noexcept;
 
-  /** Compute deformation at a given site to to ocean pole tide.
-   *
-   * The model used to compute the ocean pole tide displacement is given in
-   * Desai 2002 and IERS 2010. To perform the computation, we need model
-   * coefficients which are given (gridded) in the IERS distributed file at
-   * https://iers-conventions.obspm.fr/content/chapter7/additional_info/opoleloadcoefcmcor.txt.gz
-   * Before computing the displacement, users need to get the coefficients off
-   * from the file for the site of interest (see function
-   * get_desai_ocp_deformation_coeffs). The coefficients are passed in using a
-   * OceanPoleTideDesaiCoeffs instance.
-   *
-   * @param[in] t Time of computation
-   * @param[in] xp Pole X-coordinates at t in [arcsec]
-   * @param[in] yp Pole Y-coordinates at t in [arcsec]
-   * @param[in] rsta Spherical coordinates of site of interest
-   * @param[in] coef Model coefficients at the site of interest (interpolated
-   *            from the opoleloadcoefcmcor.txt file; see function
-   *            get_desai_ocp_deformation_coeffs). The coefficients are given
-   *            as a OceanPoleTideDesaiCoeffs instance.
-   * @param[in] Re Equatorial radius of Earth [m]; default value taken from
-   *            IERS 2010.
-   * @param[in] GMe Standard gravitational parameter (μ) of Eart in [m^3s^-2]
-   *            default value taken from IERS 2010.
-   * @param[in] omega Nominal mean Earth's angular velocity [rad/sec]; default
-   *            value taken from IERS 2010.
-   * @param[in] G Constant of gravitation in [m^3/kg/s^2]; default value taken
-   *            from IERS 2010
-   * @param[in] ge Mean equatorial gravity in [m/sec^2]; default value taken
-   *            from IERS 2010
-   * @return Cartesian components of diplacement (ΔX, ΔY, ΔZ) in [m] at the
-   *         site of interest.
-   */
-  static dso::CartesianCrd
-  deformation(const MjdEpoch &t, double xp, double yp,
-              const dso::SphericalCrdConstView rsta,
-              const dso::OceanPoleTideDesaiCoeffs &coef,
-              double Re = ::iers2010::Re, double GM = ::iers2010::GMe,
+  template <typename T>
+#if __cplusplus >= 202002L
+    requires(isSpherical<T> || isCartesian<T>)
+#endif
+  static CartesianCrd
+  deformation(const MjdEpoch &t, double xp, double yp, const T &rsta,
+              const OceanPoleTideDesaiCoeffs &coef, double Re = ::iers2010::Re,
+              double GM = ::iers2010::GMe,
               double omega = ::iers2010::OmegaEarth, double G = ::iers2010::G,
-              double ge = ::iers2010::ge) noexcept;
+              double ge = ::iers2010::ge) noexcept {
+#if __cplusplus >= 202002L
+    if constexpr (isSpherical<T>) {
+#else
+    /* no requires/concepts in c++ < 20; make sure we have a correct T type */
+    static_assert(CoordinateTypeTraits<T>::isSpherical ||
+                      CoordinateTypeTraits<T>::isCartesian,
+                  "T must be Spherical or Cartesian coordinate set!");
+    if constexpr (CoordinateTypeTraits<T>::isSpherical) {
+#endif
+      return deformation(t, xp, yp, rsta, coef, Re, GM, omega, G, ge);
+    } else {
+      static_assert(CoordinateTypeTraits<T>::isCartesian);
+      const auto sph = cartesian2spherical<T>(rsta);
+      return deformation(t, xp, yp, sph, coef, Re, GM, omega, G, ge);
+    }
+  }
+
 }; /* class OceanPoleTide */
 
 /** Get (radial, north, east) coefficients for computing deformation due to
@@ -346,18 +429,21 @@ public:
  * given site, using the Desai 2002 model (IERS 2010), we need (radial,
  * north, east) coeffcients (see e.g. IERS 2010, Ch. 7.1.5 "Ocean pole tide
  * loading", Eq. (29)).
+ *
  * Maps of the required ocean pole load tide coeﬃcients are available on an
  * equally space global grid, published by IERS at:
  * https://iers-conventions.obspm.fr/content/chapter7/additional_info/opoleloadcoefcmcor.txt.gz
+ *
  * This function computes values for these coefficients, given the
  * opoleloadcoefcmcor.txt file.
+ *
  * The coefficients are complex numbers for each component (r, n, e). For
  * each of the components, we perform bilinear interpolation to compute the
  * coefficients at the given point(s). For each of the components, the real
  * and imaginary parts are interpolated indipendently.
  */
 int get_desai_ocp_deformation_coeffs(
-    const char *fn, const std::vector<dso::SphericalCrd> &sta,
+    const char *fn, const std::vector<SphericalCrd> &sta,
     std::vector<OceanPoleTideDesaiCoeffs> &cfs) noexcept;
 
 } /* namespace dso */

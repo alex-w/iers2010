@@ -9044,9 +9044,9 @@ int main() {
     /* compute displacement */
     auto dr = set.displacement(tt, tt.tt2ut1(Data[i].dut1), rsta, rmon, rsun, fargs);
 
-    assert( std::abs(dr(0) - Data[i].res[0]) < TOLERANCE );
-    assert( std::abs(dr(1) - Data[i].res[1]) < TOLERANCE );
-    assert( std::abs(dr(2) - Data[i].res[2]) < TOLERANCE );
+    assert( std::abs(dr.x() - Data[i].res[0]) < TOLERANCE );
+    assert( std::abs(dr.y() - Data[i].res[1]) < TOLERANCE );
+    assert( std::abs(dr.z() - Data[i].res[2]) < TOLERANCE );
 
   }
 

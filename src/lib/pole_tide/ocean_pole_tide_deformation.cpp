@@ -1,13 +1,13 @@
-#include "pole_tide.hpp"
-#include "geodesy/units.hpp"
 #include "geodesy/core/crd_transformations.hpp"
+#include "geodesy/units.hpp"
+#include "pole_tide.hpp"
 
 dso::CartesianCrd
-dso::OceanPoleTide::deformation(const MjdEpoch &t, double xp, double yp,
-                                const dso::SphericalCrdConstView rsta,
-                                const dso::OceanPoleTideDesaiCoeffs &coef,
-                                double Re, double GM, double OmegaEarth,
-                                double G, double ge) noexcept {
+dso::OceanPoleTide::deformation_impl(const MjdEpoch &t, double xp, double yp,
+                                     const dso::SphericalCrdConstView rsta,
+                                     const dso::OceanPoleTideDesaiCoeffs &coef,
+                                     double Re, double GM, double OmegaEarth,
+                                     double G, double ge) noexcept {
 
   /* density of sea water in [kgm^−3] */
   constexpr const double rhow = 1025e0;
@@ -22,7 +22,7 @@ dso::OceanPoleTide::deformation(const MjdEpoch &t, double xp, double yp,
                     std::pow(Re, 4) / GM;
   const double K = 2e0 * D2PI * G * Re * rhow * Hp / 3e0 / ge;
 
-    /* IERS 2010, Ch. 7.1.5, Eq. (29) */
+  /* IERS 2010, Ch. 7.1.5, Eq. (29) */
   Eigen::Matrix<double, 3, 1> s;
   /* east */
   s(0) = (m1 * g2_real + m2 * g2_imag) * coef.eR +
@@ -38,5 +38,5 @@ dso::OceanPoleTide::deformation(const MjdEpoch &t, double xp, double yp,
   const auto R = dso::geodetic2lvlh(rsta.lat(), rsta.lon());
 
   /* apply rotation to transform to Cartesian */
-  return dso::CartesianCrd(K*(R * s));
+  return dso::CartesianCrd(K * (R * s));
 }

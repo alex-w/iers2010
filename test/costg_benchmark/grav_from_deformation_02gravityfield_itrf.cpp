@@ -91,11 +91,11 @@ int main(int argc, char *argv[]) {
       return 1;
     }
 
-    printf(
-        "[Results (2)] %.12f %.12f %.12f V=%.12f dr=(%.2f, %.2f, %.2f)[mm]\n",
-        std::abs(acc->axyz(0) - a(0)), std::abs(acc->axyz(1) - a(1)),
-        std::abs(acc->axyz(2) - a(2)), potential, dr(0) * 1e3, dr(1) * 1e3,
-        dr(2) * 1e3);
+    printf("[Results (2)] %.12f %.12f %.12f V=%.12f dr=(%.2f, %.2f, %.2f)[mm] "
+           "a=%.2f[m/sec^2]\n",
+           std::abs(acc->axyz(0) - a(0)), std::abs(acc->axyz(1) - a(1)),
+           std::abs(acc->axyz(2) - a(2)), potential, dr(0) * 1e3, dr(1) * 1e3,
+           dr(2) * 1e3, a.norm());
 
     /* get COSTG result */
     if (acc->epoch != in.epoch) {
