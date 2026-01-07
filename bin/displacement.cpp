@@ -140,10 +140,10 @@ int compute_displacement(int argc, char *argv[]) {
                          .mv;
 
     /* compute displacement due to ocean pole tide */
-    auto dr_optide = (OceanPoleTide::deformation(
-                          tt, eop.xp(), eop.yp(),
-                          cartesian2spherical(CartesianCrdConstView(rsta))))
-                         .mv;
+    //auto dr_optide = (OceanPoleTide::deformation(
+    //                      tt, eop.xp(), eop.yp(),
+    //                      cartesian2spherical(CartesianCrdConstView(rsta))))
+    //                     .mv;
 
     if (ENU) {
       const Eigen::Matrix3d R = lvlh(CartesianCrdConstView(rsta));
