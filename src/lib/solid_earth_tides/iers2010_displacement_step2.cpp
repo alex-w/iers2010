@@ -24,7 +24,7 @@ struct Table7 {
  * 
  * This is a translation of the Tables 7a and 7b of the IERS2010 standards.
  */
-constexpr const std::array<Table7, 16> Tables7 = {
+[[maybe_unused]] constexpr const std::array<Table7, 16> Tables7 = {
     /* Diurnal tidal waves */
     {{/*135655*/ {1, -2, 0, 1, 0, 0}, -8.0000e-02, +0.0000e+00, -1.0000e-02,
       +1.0000e-02},

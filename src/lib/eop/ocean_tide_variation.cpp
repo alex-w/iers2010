@@ -650,7 +650,7 @@ constexpr const std::array<Table8Data, 71> Table8 = {
       +2.00000e-02,
       +2.00000e-01,
       +6.00000e-01}}}; /* Table8 */
-constexpr const std::array<Table8Data, 28> Madzak16 = {
+[[maybe_unused]] constexpr const std::array<Table8Data, 28> Madzak16 = {
     {{{1, -3, 0, 2, 0, 0},
       0.700,
       4.800,

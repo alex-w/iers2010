@@ -16,6 +16,7 @@ find_library(CSPICE_LIB cspice REQUIRED)
 # Pass the library dependencies to subdirectories
 set(PROJECT_DEPENDENCIES Eigen3::Eigen geodesy datetime ${CSPICE_LIB})
 
+
 # Define an option for building tests (defaults to ON)
 option(BUILD_TESTING "Enable building of tests" ON)
 
